@@ -55,7 +55,7 @@ A query with zero kept hits is still worth logging; it documents a negative.
 
 ## Step 3: per-paper notes
 
-Write one note per kept paper in `paper/litreview/notes/<citekey>.md`, using the format below. Answering "why" first stops you from summarising a paper without understanding what it was for.
+Write one note per kept paper in `paper/litreview/notes/<citekey>.md`, using the format below. Parallel scouts (Step 9) write to their own `paper/litreview/axis_<letter>/notes/` first; the merge copies the kept notes here. Answering "why" first stops you from summarising a paper without understanding what it was for.
 
 ```
 # <citekey>: <title>
@@ -123,9 +123,9 @@ When there are three or more axes, run one scout per axis in parallel, using `ag
 - the axis question and the claim ids it serves,
 - the seed papers,
 - the note format and verification rule above,
-- instructions to write only inside its own notes folder and query log.
+- its output folder, `paper/litreview/axis_<letter>/`, and instructions to write only inside it (its own `notes/` and `QUERY_LOG.md`).
 
-Scouts return their notes plus a closest-prior-work verdict for the axis. Merge on return: deduplicate papers that appear on several axes, resolve any note where two scouts disagree about what a paper says by opening it yourself, and rebuild the must-cite table. Never accept a scout's reference as verified because the scout said so; spot-check at least three per axis by opening the page.
+Scouts return their notes plus a closest-prior-work verdict for the axis. Merge on return: copy each kept note into `paper/litreview/notes/`, one file per citekey; where several axes kept the same paper, keep the verified, most complete note; resolve any note where two scouts disagree about what a paper says by opening it yourself; write the combined `paper/litreview/QUERY_LOG.md` from the per-axis logs, keeping the axis column; and rebuild the must-cite table. Leave the `axis_<letter>/` folders in place as the scouts' raw record. Never accept a scout's reference as verified because the scout said so; spot-check at least three per axis by opening the page.
 
 ## Step 10: handoff to references.bib
 
@@ -136,6 +136,6 @@ Scouts return their notes plus a closest-prior-work verdict for the axis. Merge 
 
 ## Outputs and state updates
 
-Files written under `paper/litreview/`: `AXES.md`, `QUERY_LOG.md`, `notes/*.md`, `MUST_CITE.md`, `VENUE_FIT.md`, a `SYNTHESIS.md` (one page per axis: state of knowledge, the gap, where the paper sits), and `paper/references.bib` updated.
+Files written under `paper/litreview/`: `AXES.md`, `QUERY_LOG.md`, `notes/*.md`, `MUST_CITE.md`, `VENUE_FIT.md`, a `SYNTHESIS.md` (one page per axis: state of knowledge, the gap, where the paper sits), the scouts' `axis_<letter>/` folders when Step 9 ran, and `paper/references.bib` updated.
 
 Update `PROJECT_CONTEXT.md`: the closest prior work, any scoop verdict, and the Status line. Append to `LAB_LOG.md`: "Litreview ran on <date>; produced <files>; decisions: <framing changes>; open: <unverified references, scoop questions>". End with the output contract from SKILL.md.

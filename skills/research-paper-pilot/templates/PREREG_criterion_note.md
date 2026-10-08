@@ -23,7 +23,7 @@
 
 ## Primary metric
 
-<!-- Exact definition, including the denominator (for example, restricted to items where the two members of a pair differ in clean behavior). -->
+<!-- Exact definition, including the denominator (for example, restricted to matched pairs whose two members differ on the baseline measure). -->
 
 ## Bar
 
@@ -40,7 +40,7 @@
 
 ## What will not be changed after seeing results
 
-<!-- Thresholds, pooling of directions, the denominator restriction, the primary metric, the split, generation length, the detector, the pool. -->
+<!-- Thresholds, pooling of directions, the denominator restriction, the primary metric, the data split, the measurement instrument and its settings, the sample or item pool. -->
 
 - 
 

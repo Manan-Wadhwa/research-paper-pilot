@@ -30,7 +30,7 @@ Run `python scripts/check_submission.py paper --venue-pages <N>` and record each
 - [ ] Anonymity grep is clean (names, repository URLs, "our previous work", branch names)
 - [ ] Page count within the limit with the unmodified venue template
 - [ ] `check_numbers.py`: no literal numbers outside macros except allowed constants; each "in no result file" item explained
-- [ ] `verify_citations.py`: no unresolved `mismatch` or `unresolved` entry left unexamined
+- [ ] `verify_citations.py`: every entry reported as `mismatch` or `unresolved` has been examined and fixed or explained
 - [ ] `prose_gate.py --academic`: findings reviewed; no label codes left, coined names within the budget
 - [ ] Clean compile, log read for undefined references and overfull boxes
 - [ ] Every page of the PDF rendered and looked at, appendix included: no clipped figure text, nothing past the margin

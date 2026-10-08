@@ -19,7 +19,7 @@ Simulate peer review before real reviewers do. The mode runs three blind reviewe
 
 ## Why the review is blind
 
-A reviewer who has read the project notes fills gaps with what the authors meant, which is exactly what a real reviewer cannot do. A reviewer who sees the other reviewers' reports anchors on them. So each reviewer agent receives the manuscript, one lens, and the venue name, and nothing else. Do not hand over `PROJECT_CONTEXT.md`, `CLAIMS.md`, `LAB_LOG.md`, earlier reviews, or your own opinion of the paper's weaknesses. The same self-audit trap applies to you: the agent that wrote a draft rationalises its own phrasing, so the agent that reviews it must be a different one, and its raw findings must be shown, not summarised away.
+A reviewer who has read the project notes fills gaps with what the authors meant, which is exactly what a real reviewer cannot do. A reviewer who sees the other reviewers' reports anchors on them. So each reviewer agent receives exactly what Step 1 assembles: the manuscript with its figures and bibliography, one lens, the venue name and its reviewer form (when one exists), and nothing else. Do not hand over `PROJECT_CONTEXT.md`, `CLAIMS.md`, `LAB_LOG.md`, earlier reviews, or your own opinion of the paper's weaknesses. The same self-audit trap applies to you: the agent that wrote a draft rationalises its own phrasing, so the agent that reviews it must be a different one, and its raw findings must be shown, not summarised away.
 
 Reviewer agents are the same model family as the author, so role separation reduces shared context but does not give independent error processes. Say this in the report header. If the user has access to a different model family, offer it for one reviewer seat and note which seat it was.
 
@@ -89,7 +89,7 @@ python scripts/verify_citations.py paper/references.bib --out paper/review/round
 python scripts/prose_gate.py paper/main.tex --academic
 ```
 
-Paste the raw output into the report appendix. An audit claimed without its output is not an audit. If a script cannot run, print its one-line warning in the report and continue.
+Paste the raw output into the report's "Mechanical checks (raw output)" section; the appendix lists only file paths. An audit claimed without its output is not an audit. If a script cannot run, print its one-line warning in the report and continue.
 
 ## Step 7: the report
 

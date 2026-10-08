@@ -34,7 +34,7 @@ skill; an author profile may override them for one author, nothing else may.
 | Passive voice | Allowed in Methods when the actor is irrelevant. Elsewhere name the actor. | W39 |
 | Hedges | Keep one calibrated hedge where evidence is suggestive; collapse stacks; no hedge where the claim is established. | W43 |
 | "Significantly" | Only with a statistical test named or reported next to it. Otherwise say what changed and by how much. | W44 |
-| Roadmap sentences | Allowed ("Section 4 tests this"). They help a reader who skips around, but at most one per section. | W36 |
+| Roadmap sentences | One roadmap sentence, in the Introduction ("Section 4 tests this"). It helps a reader who skips around; no other section opens with a preview. | W36 |
 | Conclusion-style headings | Allowed where the venue accepts them; use topic headings where it does not. | W46 |
 | Restating results | A conclusion states the moral, not a recap; a short summary section the venue requires is the exception. | W30, W50 |
 | First person | "We" is the default for choices and findings. The author profile may change it. | W41 |
@@ -59,8 +59,8 @@ no evidence behind it the framing is too large. Choose the boldest claim the evi
 experiments have a purpose, then rewrite the introduction from a blank page after results are in.
 A surviving Draft 0 promises what the authors hoped for, not what they showed.
 
-**W5** Give each result a verdict before claiming it (supported, partial, not supported,
-equivocal). One positive result on one setting does not support a general claim. Mark which
+**W5** Give each result a verdict before claiming it (Supported, Partially supported, Not
+supported, Equivocal; `evidence.md` maps each verdict to a claim status). One positive result on one setting does not support a general claim. Mark which
 analyses were fixed before seeing data and which came after, and say how selective any qualitative
 examples are.
 
@@ -162,7 +162,7 @@ They read as notes to oneself. Never write "we do not address X" merely because 
 to omit X.
 
 **W30** Write the conclusion as a moral, not a recap: what changes for the reader's own work. Add no
-new self-negation in the last paragraph. A separate conclusion is often redundant; if the venue
+new reservation in the last paragraph. A separate conclusion is often redundant; if the venue
 wants one, keep it short.
 
 ## Figures and tables
@@ -189,8 +189,8 @@ alone makes the reader do the authors' work.
 ## Sentence and paragraph level
 
 **W36** Give each paragraph one message stated in its first sentence, and link sentences by cause,
-contrast, consequence or refinement. Four to six sentences is typical. A one-line roadmap sentence is
-allowed, once per section.
+contrast, consequence or refinement. Three to six sentences is typical. One roadmap sentence is
+allowed, in the Introduction; elsewhere no section previews what follows.
 
 **W37** Reverse-outline each section: list the topic sentences alone and check that they form the
 argument. A paragraph whose topic sentence serves no claim gets cut or moved.
@@ -209,8 +209,9 @@ comparative without naming the comparison, define each uncommon term at first us
 every sentence with "We".
 
 **W42** Delete filler such as "actually", "a bit", "very", "really", "quite", "basically",
-"essentially", "in order to", "due to the fact that", "it is worth noting", "note that", and "to our
-knowledge". Expand contractions. Cutting these costs nothing and shortens the paper.
+"essentially", "in order to", "due to the fact that", "it is worth noting" and "note that". Expand
+contractions. Cutting these costs nothing and shortens the paper. "To our knowledge" is not filler:
+it hedges a novelty claim, so keep it once, where the novelty claim is made (invariant I7).
 
 **W43** Hedge once per uncertain claim, at the claim, and not at all where the evidence is
 established. Never stack hedges ("may possibly suggest that ... could"). A calibrated hedge on a

@@ -5,11 +5,11 @@ This catalog lists the habits that make a draft read as machine-written, and say
 ## Contents
 
 - How to read the catalog
-- A. Content and claims
-- B. Vocabulary
-- C. Structure and staging
-- D. Punctuation and format
-- E. Leftovers and hygiene
+- C. Content and claims
+- V. Vocabulary
+- S. Structure and staging
+- P. Punctuation and format
+- L. Leftovers and hygiene
 - Not tells in a paper: do not act
 - Keep what carries a person
 - When not to act
@@ -23,11 +23,11 @@ This catalog lists the habits that make a draft read as machine-written, and say
 - **with care**: the pattern is also ordinary scholarly practice; repair only when the condition in the Rule column holds.
 - **no**: do not touch; the pattern is a paper convention or a template matter.
 
-Rows are candidates, not verdicts. Read the sentence in context, check the condition in the Rule column, and prefer leaving a sentence alone over a doubtful edit. One sighting of a weak tell means nothing; several tells in one passage justify action. Structure rows (group C) carry more signal than vocabulary rows (group B), so spend effort in that order. `humanize.md` gives the procedure; this file is the lookup table.
+Rows are candidates, not verdicts. Read the sentence in context, check the condition in the Rule column, and prefer leaving a sentence alone over a doubtful edit. One sighting of a weak tell means nothing; several tells in one passage justify action. Structure rows (group S) carry more signal than vocabulary rows (group V), so spend effort in that order. `humanize.md` gives the procedure; this file is the lookup table.
 
-Ids (C1, V2, S5, ...) are stable so that review reports and the humanize log can cite them.
+Ids (C1, V2, S5, ...) are stable so that review reports and the humanize log can cite them. Each group's letter is its id prefix.
 
-## A. Content and claims
+## C. Content and claims
 
 | Id | Pattern | Looks like | Repair | Safe? | Rule |
 |---|---|---|---|---|---|
@@ -37,9 +37,9 @@ Ids (C1, V2, S5, ...) are stable so that review reports and the humanize log can
 | C4 | Borrowed authority | "studies show", "experts argue", "it is widely accepted" with no source | Add the citation and what it found, or cut the claim | yes | Every attribution carries a key or goes; never invent the source (invariant I2). |
 | C5 | Citation dumping | "[3-14]" after a generic sentence | Cite the one or two works that bear on the claim and say why | with care | Field norms differ; a survey sentence may legitimately cite many. |
 | C6 | Formulaic opener | "In recent years, X has attracted considerable attention", "With the advent of" | Open on the specific gap or the problem | yes | The first sentence survives only if it names something concrete. |
-| C7 | Generic positive closer | "holds great promise", "paves the way for", "opens new avenues" | End on a concrete limitation or the next experiment | yes | A closing sentence earns its place by adding a fact or a boundary. |
+| C7 | Generic positive closer | "holds great promise", "paves the way for", "opens new avenues" | Keep the fact, drop the verdict; if nothing concrete is left, cut the sentence | yes | A closing sentence earns its place by stating a fact or a boundary already in the paper; a humanize pass never adds one (I7). |
 | C8 | Content-free challenges section | A "Challenges and Outlook" block of generic obstacles and vague optimism | Replace with specific limitations and named follow-ups | with care | The section is required by many venues; the tell is emptiness, not the heading. |
-| C9 | Over-claiming verb | "prove", "demonstrate", "establish" on correlational or small-n evidence | Match verb strength to the evidence ladder (invariant I4) | yes | Never raise a claim's strength while humanizing; lowering it to fit the evidence is allowed and must be logged. |
+| C9 | Over-claiming verb | "prove", "demonstrate", "establish" on correlational or small-n evidence | Report it and route to `evidence` or `hypothesis`, which match verb strength to the evidence ladder (invariant I4) | no (route) | Never change a claim's strength while humanizing, up or down; the wording changes only after the claim's status does. |
 | C10 | Vague hedging | "somewhat", "fairly", "relatively" with no comparison | Give the number or the comparison class, or delete | yes | A hedge that carries no information is padding; an evidence-tied hedge is content (see the protections). |
 | C11 | Empty intensifier | "extensive experiments", "numerous studies", "significantly" with no test | Give counts, datasets, effect sizes, test names | yes | Keep "significantly" only where a test backs it. |
 | C12 | Unnamed concrete world | "a popular model", "a large benchmark", "standard settings" | Name the model, dataset, hyperparameters | with care | Only if the facts are in the source; blind-review anonymity may require the vague form on purpose. |
@@ -50,7 +50,7 @@ Ids (C1, V2, S5, ...) are stable so that review reports and the humanize log can
 | C17 | Fabricated or garbled reference | A DOI that resolves to another paper, a plausible title nobody published | Run `scripts/verify_citations.py`; fix or mark `[VERIFY]` | yes | Mandatory check outside the humanize pass; never repair a citation by guessing. |
 | C18 | Audit or defensive voice | "this was verified rather than assumed", "the pipeline was confirmed to", sentences arguing with an imagined reviewer, repository chatter | State the design fact once where the reader needs it; move process detail to Methods or an appendix | with care | Keep reproducibility facts and mandated statistics reporting; delete governance language and self-congratulation. |
 
-## B. Vocabulary
+## V. Vocabulary
 
 | Id | Pattern | Looks like | Repair | Safe? | Rule |
 |---|---|---|---|---|---|
@@ -65,7 +65,7 @@ Ids (C1, V2, S5, ...) are stable so that review reports and the humanize log can
 | V9 | Vague connection | "associated with", "linked to", "tied to" used for a specific relation | Pick the verb that names the relation (predicts, increases, mediates) | with care | In observational work "associated with" is the honest word; never upgrade it to a causal verb. |
 | V10 | Field-specific word tics | "Beyond,", "via", non-locative "where", "yield", "Given" repeated | Vary only where the same word recurs within a few lines | with care | These are conventions in many subfields; check how published papers in your venue write. |
 
-## C. Structure and staging
+## S. Structure and staging
 
 Structure first: this group carries the strongest signal and is the first thing a rewrite should touch. Rows S1 to S7 are document shape; S8 to S16 are sentence-level staging.
 
@@ -75,12 +75,12 @@ Structure first: this group carries the strongest signal and is the first thing 
 | S2 | Uniform paragraph or section length | Every subsection is three paragraphs of four sentences | Let the material set the length | with care | Do not pad to vary; Methods detail is not padding. |
 | S3 | Connective paragraph openers | More than a third of paragraphs open with Moreover, Furthermore, Additionally | Open on the claim; keep a connective that names a real relation | with care | Preserve however, thus, in contrast when they mark a real logical turn; cap runs of identical openers at two. |
 | S4 | Preview and restate | Intro lists the sections; each section's first sentence echoes its heading | Say the thing once | with care | The one roadmap sentence in the Introduction is a venue convention and stays; remove the echoes inside sections. |
-| S5 | Closing loop | Conclusion repeats the Introduction in the same words with no new fact | Add a limitation, a number or a next step; cut the rest | with care | Conclusions restate by design; require at least one new element. |
+| S5 | Closing loop | Conclusion repeats the Introduction in the same words with no new fact | Cut the echo; if no new element remains, report the gap to the author and route to `write` | with care | Conclusions restate by design; a humanize pass never adds a limitation, number or next step (W30, I7). |
 | S6 | Over-explaining | A second or third sentence after the evidence restating what it meant | Cut the repeats; move speculation about mechanism to Discussion | with care | Keep the one sentence per paragraph that ties the numbers to the claim they support (W74); a Results paragraph without it is a list of numbers. Never delete the only sentence stating the mechanism. |
 | S7 | Forced triad | Three adjectives, three examples, three clauses by reflex | Keep the strongest one or two | with care | Keep real triads, such as three measured metrics. |
 | S8 | Negative parallelism | "not only X but also Y", "it is not X, it is Y", "This does not mean X. It means Y." | State the positive claim | with care | Keep when both halves carry a fact (method A against method B); cut when the negative half is a claim nobody made. |
 | S9 | One-line closer | "That is the real win.", "Let that sink in.", dramatic fragments | Delete | yes | Cut when it restates the paragraph above. |
-| S10 | Run-up | "Let us dive in", "Here is the thing", "In this section we will explore" | Delete the run-up | yes | Keep the one-sentence roadmap venues expect; delete all other throat-clearing. |
+| S10 | Run-up | "Let us dive in", "Here is the thing", "In this section we will explore" | Delete the run-up | yes | Keep the one roadmap sentence in the Introduction; delete all other throat-clearing. |
 | S11 | Rhetorical question setup | "Why does this matter? Because..." | State the answer | yes | Interrogative openers that frame the analytic question are legitimate in Introduction and Discussion; do not add them either. |
 | S12 | Stacked hedge | "may potentially suggest the possibility that" | Collapse to one hedge: "may suggest" | with care | Never remove the last hedge; never turn "suggests" into "shows". |
 | S13 | Clause-stacked sentence | More than 30 words with three or more subordinate clauses; piled noun compounds | Split at the logical seam; expand compounds on first use | with care | Split without hiding which condition belongs to which comparison. |
@@ -91,7 +91,7 @@ Structure first: this group carries the strongest signal and is the first thing 
 | S18 | Private vocabulary | Letter codes or nicknames for conditions ("arm B", "C2", "the canary run") that the reader must decode in every sentence | Report it and route to `write` or `revise`: renaming is a terminology edit | no (route) | Replace with plain descriptions and record them in the glossary table (W73); never rename inside a humanize pass, because the verification script reads each removed code as a dropped fact. |
 | S19 | Number dump | A paragraph of values in "X reads a against b" form with no sentence saying what they show | Report it and route to `write`: the values move to a table and the prose keeps the one to three that carry the claim | no (route) | Moving numbers is a content edit; a humanize rewrite must keep every number (W74, I7). |
 
-## D. Punctuation and format
+## P. Punctuation and format
 
 | Id | Pattern | Looks like | Repair | Safe? | Rule |
 |---|---|---|---|---|---|
@@ -103,7 +103,7 @@ Structure first: this group carries the strongest signal and is the first thing 
 | P6 | Colon reveal and exclamation | "The answer is:", "The key takeaway:", exclamation marks | Write the sentence | yes | Colons that introduce a real list or definition stay. |
 | P7 | Unicode obfuscation | Homoglyphs, zero-width characters, odd spaces | Remove and normalise | yes | Invisible characters break search and signal evasion; clean them whatever their origin. |
 
-## E. Leftovers and hygiene
+## L. Leftovers and hygiene
 
 | Id | Pattern | Looks like | Repair | Safe? | Rule |
 |---|---|---|---|---|---|
@@ -153,8 +153,8 @@ Act on nothing in these cases:
 - Text written before late 2022: the author wrote it, and many of these habits are older than chatbots.
 - A passage with a single weak tell and nothing else.
 - A section whose rhythm and specifics already look like the author's own: say in one line that nothing needs doing and return it unchanged.
-- Any edit that would add, drop or alter a number, a citation, a hedge that carries meaning, or the strength of a claim. Those are not style edits; send them to the evidence or write modes.
+- Any edit that would add, drop or alter a number, a citation, a hedge that carries meaning, or the strength of a claim. Those are not style edits; report them and send them to the `evidence`, `hypothesis` or `write` modes.
 
 ## Maintenance notes
 
-Vocabulary lists in group B are the most perishable part of this file: a word can fall out of use within a year, and newer models suppress some habits on their own. Treat the structure and staging rows as durable and the vocabulary rows as examples of a cluster, not as a vocabulary to ban. When a venue or field disagrees with a "safe" verdict here, follow the venue and record the exception in the author profile.
+Vocabulary lists in group V are the most perishable part of this file: a word can fall out of use within a year, and newer models suppress some habits on their own. Treat the structure and staging rows as durable and the vocabulary rows as examples of a cluster, not as a vocabulary to ban. When a venue or field disagrees with a "safe" verdict here, follow the venue and record the exception in the author profile.

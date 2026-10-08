@@ -11,9 +11,11 @@ Summary of changes (three to six lines, most important first):
 1. <change, with location>
 2. <change, with location>
 
+Comment ids: Reviewer.Comment (R1.1, R1.2, ...) for external reviews. When the comments came from this skill's own review report, keep its I-ids (I1, I2, ...) so the matrix links back to the roadmap.
+
 ---
 
-## Reviewer <1>
+## Reviewer <n>
 
 ### R1.1
 
@@ -39,7 +41,7 @@ Location:
 
 ---
 
-## Reviewer <2>
+## Reviewer <n>
 
 ### R2.1
 
@@ -72,6 +74,6 @@ For each new analysis or experiment: what ran, the metric, n, seeds and interval
 
 One row per comment id. Every row must be filled before the letter is sent.
 
-| id | action (fix / pushback / concede / deferred) | manuscript location changed | number source or file touched | check re-run (numbers / citations / prose gate) | status |
+| id | action (fix / push back with evidence / concede as limitation / defer to user) | manuscript location changed | number source or file touched | check re-run (numbers / citations / prose gate) | status (done / conceded / pushed back / deferred) |
 |---|---|---|---|---|---|
 | R1.1 | | | | | |

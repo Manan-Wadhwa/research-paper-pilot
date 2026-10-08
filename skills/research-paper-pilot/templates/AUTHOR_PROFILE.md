@@ -12,7 +12,7 @@
 ## Venues and audience
 
 - Target venues, in order of preference: 
-- Register: rigor-themed (keep a section on what the criteria could not decide) | general (state design facts, no audit voice) | other: 
+- Register: rigor-themed (keep a section on what the criteria could not decide) | general (state design facts, no audit voice) | short workshop or page-limited (three claims at most, one figure per claim) | other: 
 - Reader the author has in mind: 
 
 ## Writing habits and policies

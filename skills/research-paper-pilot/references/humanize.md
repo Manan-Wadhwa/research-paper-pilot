@@ -52,7 +52,7 @@ The order follows how much each layer carries and how fast each one decays.
 
 So the order is: structure (rhythm, connective openers, preview-then-restate, forced triads, closing loop), then staging (sentence-level moves such as not-X-but-Y), then vocabulary (clusters only), then punctuation. Do not reverse it, and do not skip to vocabulary because it is easy.
 
-A scanner run on a synthetic computer-science paper sample (abstract, methods, discussion, about 200 words in ordinary register) shows why the protections below exist. A general-purpose phrase scanner flagged a hard failure for "in conclusion", soft flags for "comprehensive" and "robust" in their plain technical senses, a "research suggests" that would carry a citation in a real paper, and the whole sample for uniform sentence length that was caused by the Methods paragraph. A structural scanner calibrated on blog prose scored two conventional connectives ("Furthermore", "Overall") at six times its human limit. A reading-grade flag fired on text no research paper could avoid. A scanner designed around regression against the source and preservation of facts passed the same sample, but its connective-opener ratio sat one paragraph from firing. Every finding that was wrong for a paper was a convention: formal connectives, scaffolding in conclusions, technical senses of ordinary words, Methods uniformity. Hence the protections list.
+Generic phrase and structure scanners, built for blogs and essays, flag paper conventions as tells: formal connectives, conclusion scaffolding, technical senses of ordinary words and uniform Methods sentences. Those false positives are why the protections list below overrides every pattern table.
 
 ## Step 0: decide whether to act, then classify each section
 
@@ -74,7 +74,7 @@ Then classify each section, because the layers apply differently:
 | Results | partial | n/a | partial | partial | n/a | partial | "This section shows" is fine; keep the sentence that ties numbers to the claim, move mechanism to Discussion. |
 | Discussion | act | partial | act | partial | n/a | interprets by design | Replace restatement with mechanism or limitation. |
 | Limitations | partial | n/a | partial | partial | n/a | no | Specific limitations stay specific. |
-| Conclusion | partial | allowed with a new element | act | partial | n/a | partial | Must add a limitation, number or next step. |
+| Conclusion | partial | allowed with a new element | act | partial | n/a | partial | Report a missing new element to the author; do not add one (W30). |
 
 "Advisory" means report it, do not rewrite it.
 
@@ -92,7 +92,7 @@ Work paragraph by paragraph, whole section in view. Four to six edits per sectio
 - Keep any short sentence that states a claim outright. Take the variation from the supporting material around it.
 - Do not create staccato. Several new very short sentences in a row is its own tell.
 
-Example (invented). Before, four sentences of 16, 15, 14 and 15 words: "The model was evaluated on three tasks. Each task used a held-out split of the data. Accuracy was measured at every checkpoint. The scores were averaged over five seeds." After: "We evaluated the model on three tasks, each with a held-out split. Accuracy was measured at every checkpoint and averaged over five seeds." The facts are identical; the lengths now differ.
+Example (invented, from a Results paragraph). Before, four sentences of 14, 15, 15 and 15 words: "Pretraining improved accuracy on all three tasks compared with the baseline trained from scratch. The pretrained model reached 81.2% accuracy on the held-out test sets, averaged over the tasks. The baseline reached 74.5% accuracy on the same held-out test sets under the same averaging. The gap between the two models was largest on the task with the longest inputs." After, three sentences of 7, 19 and 11 words: "Pretraining improved accuracy on all three tasks. Averaged over the held-out test sets, the pretrained model reached 81.2% and the baseline trained from scratch reached 74.5%. The gap was largest on the task with the longest inputs." The claim sentence is trimmed to its core, the two supporting sentences are merged, and the facts are identical.
 
 **Connective openers.** If more than a third of paragraphs open with Moreover, Furthermore or Additionally, open on the claim instead. Keep however, thus, in contrast, although and similar words that name a real relation, and never delete a connective without restoring the link in another form. Never swap one connective for another to look varied.
 
@@ -100,7 +100,7 @@ Example (invented). Before, four sentences of 16, 15, 14 and 15 words: "The mode
 
 **Forced triads.** Where three items are listed by reflex, develop the strongest one or two. Keep any triad that matches three real things (three metrics, three datasets).
 
-**Closing loop.** If the Conclusion repeats the Introduction with no new element, add one real element (a limitation, a number from the results file, a named next experiment) and cut the echo. Take the number from the numbers file, never from memory.
+**Closing loop.** If the Conclusion repeats the Introduction with no new element, cut the echo and report the gap to the author, routing it to `write`. Never add a fact in a humanize pass: a new limitation, number or next experiment is a content edit, and `verify_rewrite.py` fails it as ADDED.
 
 ## Step 3: staging
 
@@ -194,7 +194,7 @@ Do not alter any of the following, whatever a pattern table says.
 - Math, LaTeX commands, labels, references, environments, tables and code.
 - Technical senses of ordinary words: robust, significant (with a test), landscape, comprehensive when it describes real coverage.
 - Required headings (Limitations, Related Work, Broader Impact, and so on). Judge their content, not their existence.
-- The claim-strength label of every sentence: do not upgrade "suggests" to "shows", and do not downgrade "shows" without logging a decision in `LAB_LOG.md`.
+- The claim-strength label of every sentence: do not upgrade "suggests" to "shows" or downgrade "shows" to "suggests". A claim whose wording outruns its status is reported and routed to `evidence` or `hypothesis`, never reworded here.
 - Anonymization choices in a blind submission.
 
 ## The disclosure line

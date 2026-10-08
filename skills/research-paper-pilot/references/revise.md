@@ -27,7 +27,7 @@ Turn reviewer comments (real ones, or the roadmap from review mode) into a decid
 
 ## Step 1: ingest and parse
 
-Save the raw review text unchanged in `paper/revision/round<N>/REVIEWS_RAW.md`, with the source and date. Then build `paper/revision/round<N>/COMMENT_TABLE.md`, one row per atomic comment. Split a bundled paragraph into its separate asks.
+Save the raw review text unchanged in `paper/revision/round<N>/REVIEWS_RAW.md`, with the source and date. Then build `paper/revision/round<N>/COMMENT_TABLE.md`, one row per atomic comment. Split a bundled paragraph into its separate asks. Ids are Reviewer.Comment (R1.1, R1.2, R2.1, ...) for external reviews.
 
 ```
 | id | reviewer | quote (verbatim, <= 40 words) | type | severity | section | underlying concern |
@@ -43,7 +43,7 @@ Types:
 
 Use the severity scale from review mode (critical, major, minor). For each row, write the underlying concern in one sentence: what would the reviewer need to see in order to stop worrying? A request for "more datasets" may really be a worry that the effect is an artefact of one dataset; the cheapest adequate answer addresses the worry.
 
-If a roadmap from review mode is the input, the table already exists; keep its ids so the matrix links back.
+If the comments came from this skill's own review report, the table already exists; keep its I-ids (I1, I2, ...) so the matrix links back. `templates/RESPONSE_LETTER.md` uses the same two id schemes.
 
 ## Step 2: classify and decide
 
@@ -109,7 +109,7 @@ Rules for the letter:
 
 ## Step 7: the traceability matrix
 
-Append to the letter file (or save beside it) a matrix with one row per comment id: action, manuscript location changed, number source or file touched, check re-run, status (done, conceded, pushed back, deferred). This is the proof that nothing the letter promised was dropped. Before finishing, read the matrix top to bottom and confirm no row is empty.
+Append to the letter file (or save beside it) a matrix with one row per comment id: action (fix, push back with evidence, concede as limitation, defer to user), manuscript location changed, number source or file touched, check re-run, status (done, conceded, pushed back, deferred). This is the proof that nothing the letter promised was dropped. Before finishing, read the matrix top to bottom and confirm no row is empty.
 
 ## Loop limit
 
@@ -125,4 +125,4 @@ If a re-review is wanted after the first loop, run review mode again on the revi
 
 ## Outputs and state updates
 
-Files in `paper/revision/round<N>/`: `REVIEWS_RAW.md`, `COMMENT_TABLE.md`, `RESPONSE_LETTER.md` (with the matrix), the pre-revision manuscript or commit id, and updated manuscript files. Update `CLAIMS.md` where status or wording changed; update `PROJECT_CONTEXT.md` (locked decisions, open decisions, Status line). Append to `LAB_LOG.md`: "Revise round <N> ran on <date>; produced <files>; decisions: <fix, pushback, concede counts and any claim changes>; open: <deferred items>". End with the output contract from SKILL.md, naming `submit` or a second review as next.
+Files in `paper/revision/round<N>/`: `REVIEWS_RAW.md`, `COMMENT_TABLE.md`, `RESPONSE_LETTER.md` (with the matrix), the pre-revision manuscript or commit id, and updated manuscript files. Update `CLAIMS.md` where status or wording changed; update `PROJECT_CONTEXT.md` (locked decisions, open decisions, Status line). Append to `LAB_LOG.md`: "Revise round <N> ran on <date>; produced <files>; decisions: <fix, push back, concede and defer counts and any claim changes>; open: <deferred items>". End with the output contract from SKILL.md, naming `submit` or a second review as next.

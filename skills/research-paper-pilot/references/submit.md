@@ -21,7 +21,7 @@ Open the venue's official call for papers or author instructions page in this se
 
 Do not guess any of this from last year's rules or from memory. Style-file names and limits change between years, and a derived filename that looks right can be wrong. If the page cannot be opened, write "unverified" next to the item and ask the user to confirm it; do not fill in a plausible value.
 
-If the venue is not chosen, stop and ask. A submission check without a venue can only cover the generic items.
+If the venue is not chosen, ask once. If the user has no venue yet, run the generic items and mark every venue-specific item "not checked (no venue)" in the checklist.
 
 ## Step 2: run the mechanical checks
 

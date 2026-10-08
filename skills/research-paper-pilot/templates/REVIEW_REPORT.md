@@ -15,7 +15,7 @@ Attack memo (verbatim, about 200 words):
 
 Adjudication:
 
-| point | accusation (about 30 words) | verdict (answered / partial / unresolved) | evidence or gap | severity if unresolved | fix |
+| point | accusation (about 30 words) | verdict (answered by current text / partially answered / unresolved) | evidence or gap | severity if unresolved | fix |
 |---|---|---|---|---|---|
 | P1 | | | | | |
 
@@ -35,21 +35,35 @@ Severity test: critical = this defect alone could justify rejection or invalidat
 |---|---|---|---|---|---|---|
 | I1 | | | | | | |
 
-## 4. Disagreements between referees
+## 4. Strengths and questions for the authors
+
+Strengths as the referees named them, each tied to a location (up to five per referee):
+
+| referee | strength | location | what would be lost without it |
+|---|---|---|---|
+
+Questions for the authors (only those whose answer would change a referee's view):
+
+| referee | question | location | what the answer would change |
+|---|---|---|---|
+
+## 5. Disagreements between referees
 
 | issue | position A | position B | what the manuscript's evidence favours, or "unresolved" |
 |---|---|---|---|
 
-## 5. Numbers audit (zero context)
+## 6. Numbers audit (zero context)
 
-Counts: exact <n>, rounding-ok <n>, mismatch <n>, no evidence found <n>.
+Counts: exact <n>, rounding-ok <n>, mismatch <n>, no-evidence-found <n>.
+
+Status is one of: exact, rounding-ok, mismatch, no-evidence-found.
 
 | id | location | claim text | evidence file and field | value in file | status | suggested correction |
 |---|---|---|---|---|---|---|
 
 Scope words flagged: <list with the coverage actually tested>
 
-## 6. Mechanical checks (raw output)
+## 7. Mechanical checks (raw output)
 
 Paste the unedited output, or the one-line warning if a script could not run.
 
@@ -59,22 +73,22 @@ verify_citations:
 prose_gate:
 ```
 
-## 7. Revision roadmap
+## 8. Revision roadmap
 
 | item | issue ids | obligation (must fix / should fix / consider) | manuscript location | cost scope (rewording / analysis on existing outputs / new experiment / new data) | what the authors should be able to show afterwards | depends on |
 |---|---|---|---|---|---|---|
 
-## 8. Decisions for the user
+## 9. Decisions for the user
 
 List the choices only the user can make: claims to narrow, experiments to run, items to concede as limitations. After the user answers, record each decision here with its reason and copy it to PROJECT_CONTEXT.md.
 
 | item | options | cost of each | user decision | reason |
 |---|---|---|---|---|
 
-## 9. Chair notes
+## 10. Chair notes
 
 <Observations no referee raised, labelled as the chair's.>
 
-## 10. Appendix
+## 11. Appendix
 
-Reviewer reports: <paths>. Attack and adjudication memos: <paths>. Numbers audit output: <path>.
+Paths only; the raw script output belongs in section 7. Reviewer reports: <paths>. Attack and adjudication memos: <paths>. Numbers audit output: <path>.
