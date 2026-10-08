@@ -133,7 +133,7 @@ Typed numbers drift. The paper's numbers come from one place.
 1. A script reads result files and writes `paper/numbers.tex`: one `\newcommand` per number, with a name that says what it is, for example `\numFlipRate`. Each macro cites its file and field in a comment.
 2. Prose and captions use macros. Tables are generated or filled from the same file.
 3. Each result file has a provenance sidecar (script, git hash, date, config) so a number can be traced back.
-4. Run `python scripts/check_numbers.py paper/main.tex --numbers paper/numbers.tex --results-dir results`. It flags literals in prose that are not macros and numbers that appear in no result file. A WARN for a missing optional input is fine; continue.
+4. Run `python3 <skill>/scripts/check_numbers.py paper/main.tex --numbers paper/numbers.tex --results-dir results`. It flags literals in prose that are not macros and numbers that appear in no result file. A WARN for a missing optional input is fine; continue.
 5. Never edit a result file to make a number match (invariant I3). Fix the script or the claim.
 
 Rounding: round once, at the macro, to the precision the interval supports. Do not round a number and then compute with the rounded value.

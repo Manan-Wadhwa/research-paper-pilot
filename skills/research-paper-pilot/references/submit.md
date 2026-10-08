@@ -26,10 +26,10 @@ If the venue is not chosen, ask once. If the user has no venue yet, run the gene
 ## Step 2: run the mechanical checks
 
 ```
-python scripts/check_submission.py paper --venue-pages <N>
-python scripts/check_numbers.py paper/main.tex --numbers paper/numbers.tex --results-dir results
-python scripts/verify_citations.py paper/references.bib --online --out paper/CITATION_REPORT.md
-python scripts/prose_gate.py paper/main.tex --academic
+python3 <skill>/scripts/check_submission.py paper --venue-pages <N>
+python3 <skill>/scripts/check_numbers.py paper/main.tex --numbers paper/numbers.tex --results-dir results
+python3 <skill>/scripts/verify_citations.py paper/references.bib --online --out paper/CITATION_REPORT.md
+python3 <skill>/scripts/prose_gate.py paper/main.tex --academic
 ```
 
 `check_submission.py` covers: every `\ref` and `\cite` resolves; the bibliography holds only cited entries; no `[VERIFY]`, `TODO`, `XXX` or `FIXME` remains; figure files exist and are referenced; an anonymity grep for names, repository URLs and phrases like "our previous work"; the page count of a compiled PDF; whether a checklist file is present; stub sections and long verbatim blocks of pasted script output; and, from the compile log, overfull boxes where text runs past the margin. Read its output in full and fix what it finds. A script that cannot run prints a warning; list those warnings in the checklist as "not checked" rather than treating them as passes.

@@ -81,9 +81,9 @@ Estimate cost honestly: rewording, new analysis on existing outputs, new run, ne
 After the edits, run:
 
 ```
-python scripts/check_numbers.py paper/main.tex --numbers paper/numbers.tex --results-dir results
-python scripts/verify_citations.py paper/references.bib --online
-python scripts/prose_gate.py paper/main.tex --academic
+python3 <skill>/scripts/check_numbers.py paper/main.tex --numbers paper/numbers.tex --results-dir results
+python3 <skill>/scripts/verify_citations.py paper/references.bib --online
+python3 <skill>/scripts/prose_gate.py paper/main.tex --academic
 ```
 
 Fix anything the edits broke. If the edits touched prose, and the user wants a humanize pass, run it only after numbers and citations are frozen, with `scripts/verify_rewrite.py` as in humanize mode. Check `CLAIMS.md` against the edited text once more: every claim's wording must still match its status.

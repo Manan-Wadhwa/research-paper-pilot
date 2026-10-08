@@ -15,6 +15,16 @@ Readability: a paper that reads without a glossary.
 - `submit` renders and inspects every page; a plain-language task eval was added.
 - CHANGELOG now counts fifteen reference files.
 
+Correctness: fixes from the file-by-file review.
+
+- `verify_rewrite.py` keeps exponents, fails by default on lost or moved negations and lost hedges or approximators, and no longer reads sentence-initial words as proper nouns. I7 now says what the script checks rather than claiming proof.
+- `check_numbers.py`, `verify_citations.py`, `check_submission.py`, `check_skill.py`, `inventory_project.py`, `transcripts_digest.py` and `prose_gate.py`: the confirmed bugs from the review are fixed (biblatex citations, duplicate and case-only bib keys, whole-surname author matching, year filtering, one-decimal table values, `--include-parents`, non-UTF-8 filenames, a 70-fold speed-up on large projects, and more; see the commit log).
+- `check_skill.py` warns when the version differs across SKILL.md and the plugin manifests, and when a document names a script that does not exist.
+- One claim vocabulary: evidence verdicts map onto the status ladder, `hypothesis.md` holds the only verb table, and the CLAIMS template gains Type, Falsifier, Verdict and In paper columns.
+- Contradictions resolved across humanize, style rules, the pattern catalog, review, revise, submit, litreview and the templates; humanize never adds a fact or changes claim strength.
+- Script commands in every reference read `python3 <skill>/scripts/...`; I10 no longer requires `python`.
+- Evals: a write-mode positive, a two-mode "ask" case, genuine near misses, and unambiguous task setups. The plugin manifests drop the redundant `skills` arrays.
+
 ## 0.1.0
 
 Initial release.

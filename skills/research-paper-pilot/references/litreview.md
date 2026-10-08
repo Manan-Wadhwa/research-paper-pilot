@@ -131,7 +131,7 @@ Scouts return their notes plus a closest-prior-work verdict for the axis. Merge 
 
 1. For each verified note, take the BibTeX from the publisher, DOI or arXiv export, not from memory. Keep the entry's key equal to the note's citekey.
 2. Mark any entry from an unverified note with a `note = {[VERIFY]}` field so the submission check catches it.
-3. Run `python scripts/verify_citations.py paper/references.bib --online --out paper/litreview/CITATION_REPORT.md`. Treat `mismatch` and `unresolved` as work items. If the script cannot go online, it warns and still gives the offline checks; say so in the output.
+3. Run `python3 <skill>/scripts/verify_citations.py paper/references.bib --online --out paper/litreview/CITATION_REPORT.md`. Treat `mismatch` and `unresolved` as work items. If the script cannot go online, it warns and still gives the offline checks; say so in the output.
 4. Resolve every `mismatch` by opening the page. Do not delete an entry just because the script flagged it; the script is a screen, not a judge.
 
 ## Outputs and state updates

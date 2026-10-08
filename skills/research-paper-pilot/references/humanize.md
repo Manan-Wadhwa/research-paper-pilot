@@ -86,7 +86,7 @@ Before any edit, list the spans that must not change (see "The protections list"
 
 Work paragraph by paragraph, whole section in view. Four to six edits per section is typical; more means the draft needs rewriting by its author, not polishing.
 
-**Rhythm.** Measure before you edit: `python scripts/prose_gate.py <file> --academic` reports mean sentence length and its coefficient of variation. A paragraph is uniform when most sentences sit within five words of each other. Fix by merging two supporting sentences into one longer sentence, or by trimming one to its core. Rules that keep clarity intact:
+**Rhythm.** Measure before you edit: `python3 <skill>/scripts/prose_gate.py <file> --academic` reports mean sentence length and its coefficient of variation. A paragraph is uniform when most sentences sit within five words of each other. Fix by merging two supporting sentences into one longer sentence, or by trimming one to its core. Rules that keep clarity intact:
 
 - Never merge two sentences that each state a claim; never hide which condition belongs to which comparison.
 - Keep any short sentence that states a claim outright. Take the variation from the supporting material around it.
@@ -138,13 +138,15 @@ Em dashes are capped, not banned: none in the abstract, at most one per paragrap
 After every rewrite, with no exceptions, run:
 
 ```
-python scripts/verify_rewrite.py drafts/intro.v1.tex intro.tex
+python3 <skill>/scripts/verify_rewrite.py drafts/intro.v1.tex intro.tex
 ```
 
 Add `--strict` when the author wants structural regressions to fail as well. The script compares the rewrite with the source and reports:
 
 - **DROPPED**: a number, unit, year, proper noun, citation key, URL, quoted string or LaTeX reference present in the source and absent in the rewrite. This is a lost fact. The run fails.
 - **ADDED**: the same kinds of token present in the rewrite and absent in the source. This is an invented fact, the worse error. The run fails.
+- **DROPPED or ADDED negation, hedge or approximator**: a "not", "no", "may", "suggests", "about" or a bound such as "p < 0.05" that lost or gained its counterpart in the matching clause, including a negation that moved to a different claim. The run fails. `--lenient-hedges` and `--lenient-negations` downgrade these to warnings for a deliberate, author-approved change; never use them to get a pass.
+- **Direction and range warnings**: "rose" became "fell" next to the same numbers, or "from X to Y" was reversed. These warn (fail under `--strict`); check each one against the result file.
 - **Structural regression**: sentence-length variation and paragraph-length variance before and after. If either fell, the rewrite removed surface tells and flattened the prose beneath them. This warns (fails under `--strict`).
 
 How to respond:

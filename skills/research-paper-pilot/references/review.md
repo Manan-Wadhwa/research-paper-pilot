@@ -84,9 +84,9 @@ Merge its mismatches into the roadmap as critical when they change a conclusion 
 These need no judgement, so run them rather than asking an agent:
 
 ```
-python scripts/check_numbers.py paper/main.tex --numbers paper/numbers.tex --results-dir results
-python scripts/verify_citations.py paper/references.bib --out paper/review/round<N>/CITATION_REPORT.md
-python scripts/prose_gate.py paper/main.tex --academic
+python3 <skill>/scripts/check_numbers.py paper/main.tex --numbers paper/numbers.tex --results-dir results
+python3 <skill>/scripts/verify_citations.py paper/references.bib --out paper/review/round<N>/CITATION_REPORT.md
+python3 <skill>/scripts/prose_gate.py paper/main.tex --academic
 ```
 
 Paste the raw output into the report's "Mechanical checks (raw output)" section; the appendix lists only file paths. An audit claimed without its output is not an audit. If a script cannot run, print its one-line warning in the report and continue.

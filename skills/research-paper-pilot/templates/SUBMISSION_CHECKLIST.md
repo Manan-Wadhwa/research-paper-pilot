@@ -20,7 +20,7 @@ Manuscript version: <commit, tag or archive name>
 
 ## 2. Mechanical checks
 
-Run `python scripts/check_submission.py paper --venue-pages <N>` and record each result. A check that could not run is "not checked", never "pass".
+Run `python3 <skill>/scripts/check_submission.py paper --venue-pages <N>` and record each result. A check that could not run is "not checked", never "pass".
 
 - [ ] Every `\ref` and `\cite` resolves
 - [ ] The bibliography holds only cited entries
