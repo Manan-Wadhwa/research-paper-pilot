@@ -1,6 +1,6 @@
 # Hypothesis: pin down what the paper claims and how strongly
 
-This mode produces the HYPOTHESIS section of `paper/PROJECT_CONTEXT.md` and the first rows of `paper/CLAIMS.md`. It works by questioning the user, not by announcing an answer, because the thesis has to be one the authors can defend under attack.
+This mode fills the Hypotheses and Headline claim and strength sections of `paper/PROJECT_CONTEXT.md` and the first rows of `paper/CLAIMS.md`. It works by questioning the user, not by announcing an answer, because the thesis has to be one the authors can defend under attack.
 
 ## Contents
 
@@ -34,6 +34,8 @@ Ask one question per message. Offer a draft answer built from the files so the u
 
 Stop asking when each answer is written in PROJECT_CONTEXT.md. Record the date and `[user]` beside each.
 
+If no user is available (a background or non-interactive run), or the user asks you to proceed without the questions, do not stall: answer each question from the files, mark each answer `[inferred]` with the file it came from, and list the unanswered questions in the Open decisions section of PROJECT_CONTEXT.md and in the Open items of the output contract.
+
 ## The hypothesis rubric
 
 Score each hypothesis against five checks. A hypothesis that fails a check gets rewritten or demoted to exploratory.
@@ -50,7 +52,7 @@ The "matches the lock" check is the one teams skip. When the paper's claim diffe
 
 ## The claim-strength ladder
 
-Every claim sits on exactly one rung. The rung decides which verbs the paper may use ("establishes", "shows", "suggests", "is consistent with").
+Every claim sits on exactly one rung. The rung decides which verbs the paper may use. This table is the single source for that wording; `references/write.md` and `agents/section-writer.md` point here.
 
 | Rung | Definition | Typical wording |
 |---|---|---|
@@ -58,14 +60,14 @@ Every claim sits on exactly one rung. The rung decides which verbs the paper may
 | Supported | Passed its bar in the main setting, but the interval touches the bar, or it was checked in one setting only, or the lock was weak (fixed in code, not registered) | "Our results indicate" |
 | Equivocal | Clears one condition and not another, one direction and not the other, or the point estimate passes while the interval straddles the bar | "Mixed evidence", reported as such |
 | Retired | Failed a pre-committed bar, or was overturned by an audit. Keep it in the ledger; the paper reports it as a negative finding or leaves it out with a log entry | "We did not find" |
-| Exploratory | Not stated before the run; found while looking. Always labelled post hoc | "In an exploratory analysis" |
+| Exploratory | Not stated as a hypothesis before looking at the data; found while looking (hypothesis-generating). Always labelled post hoc, because no test was fixed for it in advance | "In an exploratory analysis", "we observe" |
 
 Rules for using the ladder:
 
 - Strength follows the weakest link: a claim resting on one direction of a two-direction test is equivocal, however large the other direction is.
 - Do not average away direction- or arm-specific results. Report each.
 - A claim never moves up the ladder because of rewording. It moves up by new evidence, logged with the file that provides it.
-- Pre-registered versus post hoc is a second axis, not a rung. A claim can be supported and post hoc. Say both.
+- Pre-registered versus post hoc is a second axis, not a rung: it records whether the test and its criterion were fixed before the run. Exploratory is about the claim: it was not stated as a hypothesis before looking. So a claim stated in advance whose bar was chosen after the run can be supported and post hoc; say both. An exploratory claim is always post hoc, and leaves the exploratory rung only through a new test fixed in advance.
 
 ### Claim type: what kind of statement is being made
 
@@ -83,12 +85,13 @@ For every claim also write its falsifier: the result that would make the team re
 
 ## Original, evolved, current
 
-Fill this table in PROJECT_CONTEXT.md. It is the honest history of the hypothesis and the source of the paper's rigor section.
+Fill this table in the Hypotheses section of PROJECT_CONTEXT.md, adding one Evolved row per shift (Evolved 1, Evolved 2, and so on). It is the honest history of the hypothesis and the source of the paper's rigor section.
 
 | Round or date | Hypothesis wording | What triggered the change | Evidence file | Locked in advance? |
 |---|---|---|---|---|
 | Original (first note) | quoted verbatim | n/a | design note | yes or no |
 | Evolved 1 | | audit, null result, reviewer, new data | path | |
+| Evolved 2 | | | | |
 | Current | | | | |
 
 Include shifts that look embarrassing. A hypothesis that was narrowed after a null result is a normal part of research, and a reviewer who finds the shift unreported will assume concealment. State the shift once, plainly, with the trigger.
@@ -98,7 +101,7 @@ Include shifts that look embarrassing. A hypothesis that was narrowed after a nu
 Write the thesis as one sentence with one claim, then run these tests.
 
 - **Single-idea test.** The sentence contains no "and" that joins two separate findings. If it does, the paper has two ideas; pick one and move the other to a supporting role.
-- **Deletion test.** Delete the sentence from the paper. If every result still has a reason to be there, the sentence is not the thesis. A real thesis is what the results are for.
+- **Thesis-removal test.** Delete the thesis sentence from the paper (not to be confused with the deletion test of W3, which strips the model and dataset from a claim). If every result still has a reason to be there, the sentence is not the thesis. A real thesis is what the results are for.
 - **Substitution test.** Replace the key noun or verb with the strongest rival explanation. If the sentence is still as defensible on your evidence, the thesis does not distinguish your story from the rival, and the missing evidence is the control that would.
 - **Outsider test.** Read it to someone outside the subfield. If they cannot say what would count against it, it is too vague.
 - **Evidence test.** For each clause, name the claims-ledger row that supports it. A clause without a row is an aspiration.
@@ -128,7 +131,7 @@ An equivocal result (one condition passes, one fails) does not license the headl
 
 ## Outputs
 
-- The HYPOTHESIS section of PROJECT_CONTEXT.md: headline claim, its rung, the original, evolved and current table, scope, fallback.
-- New or updated rows in `paper/CLAIMS.md` for every claim discussed, each with status, evidence file, pre-registered flag, caveat.
+- In PROJECT_CONTEXT.md: the Hypotheses table (original, evolved, current), and under Headline claim and strength the headline, its rung, the scope line and the fallback.
+- New or updated rows in `paper/CLAIMS.md` for every claim discussed, each with type, falsifier, status, evidence file, pre-registered flag, caveat.
 - A LAB_LOG entry: "Hypothesis ran on <date>; headline now <...>; retired <...>; open <...>".
 - The output contract from SKILL.md. Next recommended mode: `evidence` if any claim lacks a result file or a verdict, otherwise `litreview`.

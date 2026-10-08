@@ -97,7 +97,7 @@ Write each answer into PROJECT_CONTEXT.md with the date and `[user]`, so a later
 Copy `templates/PROJECT_CONTEXT.md` to `paper/PROJECT_CONTEXT.md` and fill every section. Rules:
 
 - The identity sentence names the object studied, the question, and the method in one line a stranger can parse. If you cannot write it, the interview is not finished.
-- Hypotheses go in three columns: original, evolved, current. Quote the original from the first commit or first design note. Hand the rest to `references/hypothesis.md`.
+- Hypotheses go in rows: original, one Evolved row per shift (Evolved 1, Evolved 2, ...), current. Quote the original from the first commit or first design note. Hand the rest to `references/hypothesis.md`.
 - Locked decisions carry a date and a reason. Open decisions carry an owner and what is blocked on them.
 - The key-files map points to the numbers file, the figure generators, the paper, the logs.
 - Use `[unverified]` for anything not opened and `[user]` for anything the user told you.
@@ -117,6 +117,8 @@ Write `paper/PROJECT_EXPLAINER.md` for a newcomer who has never seen the project
 8. **What is running now.** Processes, partial outputs, untracked files, their timestamps, and what each outcome would license.
 9. **What is missing.** Documents cited but absent, results with no document, claims with no result file.
 10. **Where to look.** A map from topic to file.
+
+Skip when trivial: for a small project, the explainer may collapse sections that would be empty into one line each (for example "Nothing is running now; nothing is missing"). Never skip the claims table (section 4) and the dated story arc (section 3).
 
 Date-stamp the explainer ("as of <date>") at the top so a reader can tell which parts will go stale.
 

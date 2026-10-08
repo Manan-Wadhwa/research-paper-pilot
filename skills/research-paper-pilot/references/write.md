@@ -38,8 +38,9 @@ because it will go stale on the next re-run.
 Before any prose, write the whole paper as three bullets, each a claim a reader could repeat to a
 colleague. Then check three things:
 
-- Each bullet maps to at least one claim in CLAIMS.md, and every claim marked "goes in the paper"
-  serves a bullet. A claim that serves none moves to the appendix.
+- Each bullet maps to at least one claim in CLAIMS.md, and every claim whose "In paper" column
+  says main serves a bullet. A claim that serves none moves to the appendix (set "In paper" to
+  appendix).
 - The bullets form a story: what readers currently believe, what crack the evidence opens, what
   follows once the crack is accepted.
 - A title can be written for them. A title that will not come is usually a sign of two papers in
@@ -176,8 +177,10 @@ only the title should guess the claim.
 Phrase each contribution as a finding with a pointer: "We show that X (Section 4, Figure 2)".
 Avoid "We study", "We propose" (unless a method is the contribution) and "We provide extensive
 experiments" (W14). Two to four contributions is typical. Check each one against CLAIMS.md: its
-status must permit the verb. An exploratory claim takes "we observe" or "we find preliminary
-evidence", a supported claim takes "we show", and a retired claim does not appear.
+status must permit the verb, using the wording column of the claim-strength ladder in
+`hypothesis.md`, the single source for these verbs: "We show" only for an established claim, "Our
+results indicate" for a supported one, "In an exploratory analysis" or "we observe" for an
+exploratory one, and a retired claim does not appear as a contribution.
 
 ## Terminology: plain words first, no reader glossary
 
@@ -241,7 +244,8 @@ the author profile. Require the writer to:
 - cite macros, not literals, and list every macro it used;
 - use the plain phrases from the glossary's last column, and report any new name it introduced;
 - return the section plus the list of claim ids it relied on;
-- insert `[VERIFY]` where it wanted a citation it had not been given;
+- write `\cite{TODO_<topic>}` where it wanted a citation it had not been given, and list it; keep
+  `[VERIFY]` for a reference that exists but has not been verified (invariant I2);
 - avoid forward references to numbers in sections it has not seen.
 
 Merge the sections yourself. After merging, read the whole paper for term drift (W45) and for
@@ -292,12 +296,13 @@ accepting the section.
 
 The draft is ready for review when: every claim in the three-bullet story has a section; every
 number is a macro or a value traced in the numbers file; `check_numbers.py` has no unexplained
-flags; every citation is fetched or marked `[VERIFY]`; the gate worklist is clear or each
-remaining item has a reason; a fresh reader given only the abstract, introduction and one random
+flags; no `\cite{TODO_<topic>}` remains; every citation is fetched or marked `[VERIFY]`; the
+gate worklist is clear or each remaining item has a reason; a fresh reader given only the abstract, introduction and one random
 Results paragraph can restate that paragraph's finding without guessing a word; and the venue's page
 limit is met with the appendix policy known.
 
 Append to LAB_LOG.md: "Mode write ran on <date>; produced <files>; decisions: register, claim
-status changes, any claim moved to the appendix; open: [VERIFY] count, pending figures." Update the
+status changes, any claim moved to the appendix; open: [VERIFY] and TODO citation counts, pending
+figures." Update the
 status line of PROJECT_CONTEXT.md. End with the standard output contract: files written,
 decisions taken, open items, next mode (usually `humanize` then `review`).
