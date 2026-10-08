@@ -189,6 +189,9 @@ def inline_clean(s):
         if new == s:
             break
         s = new
+    # comparison macros written outside math ("p \leq 0.05") keep their meaning instead of vanishing
+    s = re.sub(r"\\(?:leq?|textless)(?![a-zA-Z])", "\u2264", s)
+    s = re.sub(r"\\(?:geq?|textgreater)(?![a-zA-Z])", "\u2265", s)
     s = LEFTOVER_CMD_RE.sub("", s)
     s = re.sub(r"\\\\(?:\[[^\]]*\])?", " ", s)
     s = re.sub(r"\\[,;:! @\-]", " ", s)
@@ -307,7 +310,8 @@ def clean_markdown(raw):
         out.append(line)
     s = "\n".join(out)
     s = re.sub(r"<!--.*?-->", lambda m: nl(m.group(0)), s, flags=re.S)
-    s = re.sub(r"<[^>\n]+>", "", s)
+    # only real tags: "p < 0.05 and n > 30" is text, not a tag
+    s = re.sub(r"</?[A-Za-z][A-Za-z0-9-]*(?:\s[^<>]*)?/?>", lambda m: nl(m.group(0)), s)
     s = re.sub(r"`[^`\n]*`", "CODE", s)
     s = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", s)
     s = re.sub(r"\[([^\]]+)\]\((?:[^)]*)\)", r"\1", s)
@@ -474,8 +478,11 @@ HARD_RE = re.compile(r"\b(?:" + HARD_WORDS + r")\b", re.I)
 SOFT_RE = re.compile(r"\b(?:" + SOFT_WORDS + r")\b", re.I)
 HYPE_RE = re.compile(r"\b(?:" + HYPE_WORDS + r")\b", re.I)
 SIGNIF_RE = re.compile(r"\bsignifican(?:t|tly)\b", re.I)
+# the p-value alternative sits outside the trailing \b: in "(p = 0.01)" or "(p < .05)" the operator is followed by
+# a space or a dot, where \b never matches
 TEST_RE = re.compile(
-    r"\b(?:p\s*[<=>]|p-value|t-test|test|tests|ci|confidence interval|bootstrap|wilcoxon|permutation|anova|"
+    r"\bp\s*(?:[<=>\u2264\u2265]|\\(?:leq?|geq?|lt|gt)(?![A-Za-z]))"
+    r"|\b(?:p-values?|t-test|test|tests|ci|confidence interval|bootstrap|wilcoxon|permutation|anova|"
     r"mann-whitney|chi-square|fdr|bonferroni|tost|mixed model|regression|effect size|MATH|NUMMATH)\b"
     r"|\b(?:NUM)?MATH\b", re.I)
 CONNECTIVE_RE = re.compile(
@@ -538,7 +545,8 @@ class Finding:
 
 
 def section_of(headings, appendix_line, line):
-    """Top-level section name for a line, with an appendix flag."""
+    """Top-level section name for a line, with an appendix flag. An appendix section that shares its name
+    with a main-text section is called "Name (appendix)", so the two never share statistics or protection."""
     name, app = "(front matter)", False
     for ln, lv, title in headings:
         if lv != 1:
@@ -548,6 +556,9 @@ def section_of(headings, appendix_line, line):
             app = appendix_line is not None and ln >= appendix_line
         else:
             break
+    if app and any(lv == 1 and ln < appendix_line and (title or "(untitled)") == name
+                   for ln, lv, title in headings):
+        name += " (appendix)"
     return name, app
 
 
