@@ -1,0 +1,166 @@
+{
+  "skill_name": "research-paper-pilot",
+  "version": "0.1.0",
+  "notes": "Trigger evals test whether the skill is selected from the description alone. Task evals test behaviour once selected. Run trigger evals with the skill description loaded next to other installed skills; mark pass when the trigger decision matches should_trigger and, for positives, the chosen mode matches expected_mode.",
+  "trigger_evals": [
+    {
+      "id": "t01",
+      "query": "ok so we have all these results in the repo and a half written tex, where are we? i have been away for two weeks and honestly lost the plot",
+      "should_trigger": true,
+      "expected_mode": "understand"
+    },
+    {
+      "id": "t02",
+      "query": "reviewer 2 says the circuit we found is post hoc and the baseline is unfair. help me figure out what to concede and what to push back on",
+      "should_trigger": true,
+      "expected_mode": "revise"
+    },
+    {
+      "id": "t03",
+      "query": "does this abstract sound like chatgpt? paste below. its for a workshop submission, dont change any of the numbers",
+      "should_trigger": true,
+      "expected_mode": "humanize"
+    },
+    {
+      "id": "t04",
+      "query": "can you check that every number in main.tex actually matches what is in results/exp3.json before i send this to my advisor",
+      "should_trigger": true,
+      "expected_mode": "evidence"
+    },
+    {
+      "id": "t05",
+      "query": "need a related work section but i dont trust my bib, half of those entries i copied from an old paper. verify them first",
+      "should_trigger": true,
+      "expected_mode": "litreview"
+    },
+    {
+      "id": "t06",
+      "query": "turn this repo into a paper. we ran arm A vs arm B on three seeds, notes are in NOTES.md and the figures are rough",
+      "should_trigger": true,
+      "expected_mode": "understand"
+    },
+    {
+      "id": "t07",
+      "query": "can you play reviewer for me? i want the harshest possible read of the draft before the deadline, and also check the neurips checklist",
+      "should_trigger": true,
+      "expected_mode": "review"
+    },
+    {
+      "id": "t08",
+      "query": "make figure 1 for the paper from results/sweep.csv, colourblind safe, the caption should say the takeaway",
+      "should_trigger": true,
+      "expected_mode": "figures"
+    },
+    {
+      "id": "t09",
+      "query": "our original hypothesis was that the effect scales with size but the 7B run kind of killed it. what can we still honestly claim?",
+      "should_trigger": true,
+      "expected_mode": "hypothesis"
+    },
+    {
+      "id": "t10",
+      "query": "is it ready to submit? camera-ready is due friday, need to anonymize and make the arxiv version too",
+      "should_trigger": true,
+      "expected_mode": "submit"
+    },
+    {
+      "id": "n01",
+      "query": "write my fellowship statement, the prompt is 'describe your research vision in 500 words'",
+      "should_trigger": false,
+      "expected_alternative": "advocate"
+    },
+    {
+      "id": "n02",
+      "query": "fix the failing test in train.py, the dataloader returns the wrong shape on the last batch",
+      "should_trigger": false
+    },
+    {
+      "id": "n03",
+      "query": "summarize this pdf for me, it is a 40 page company annual report",
+      "should_trigger": false
+    },
+    {
+      "id": "n04",
+      "query": "make this marketing email sound less like AI, it is for our product launch newsletter",
+      "should_trigger": false
+    },
+    {
+      "id": "n05",
+      "query": "screen these 800 abstracts against my inclusion criteria for a PRISMA flow diagram",
+      "should_trigger": false,
+      "expected_alternative": "a dedicated systematic-review screener"
+    },
+    {
+      "id": "n06",
+      "query": "refactor the plotting helpers in utils/plots.py to use a single style config",
+      "should_trigger": false
+    },
+    {
+      "id": "n07",
+      "query": "write a cover letter for a postdoc application at a climate lab",
+      "should_trigger": false,
+      "expected_alternative": "advocate"
+    },
+    {
+      "id": "n08",
+      "query": "explain what attention is and how transformers work, i am preparing for an interview",
+      "should_trigger": false
+    },
+    {
+      "id": "n09",
+      "query": "draft a blog post announcing our open-source library release",
+      "should_trigger": false
+    },
+    {
+      "id": "n10",
+      "query": "convert this csv of survey answers to a pandas dataframe and compute the mean per question",
+      "should_trigger": false
+    }
+  ],
+  "task_evals": [
+    {
+      "id": "task_a_understand",
+      "mode": "understand",
+      "prompt": "Use research-paper-pilot on this project. I have forgotten what it is about and need to write it up. Start from scratch.",
+      "setup": "A small repository with at least 12 dated git commits by two authors, a RESULTS.md that lists three experiments and their headline numbers, a results/ directory with one JSON file per experiment, a README that mentions a document NOTES_v2.md which does not exist on disk, and a paper/ directory with a half-written main.tex.",
+      "expected_output": "Runs scripts/inventory_project.py and writes paper/PROJECT_INVENTORY.md. Reads README, RESULTS.md, paper/ and git history before asking anything, then asks the user one question at a time and only about what the files cannot answer. Writes paper/PROJECT_CONTEXT.md from the template with a one-sentence identity, the question, hypotheses, claims with status and evidence pointers, and a Missing documents entry naming NOTES_v2.md. Produces a plain-language explainer with a glossary and a dated story arc, plus one worked example of a real data item. Ends with the four-part output contract and a LAB_LOG entry.",
+      "assertions": [
+        "PROJECT_INVENTORY.md exists and lists the git authors with commit counts",
+        "PROJECT_CONTEXT.md exists and has a one-line Status line",
+        "NOTES_v2.md is reported as cited but absent",
+        "Each claim in the explainer has a status from the ladder (established, supported, equivocal, retired, exploratory) and a file pointer",
+        "No result file was modified",
+        "The reply ends with files written, decisions taken, open items and next recommended mode"
+      ]
+    },
+    {
+      "id": "task_b_check_numbers",
+      "mode": "evidence",
+      "prompt": "Check the numbers in paper/main.tex against our results before I send it.",
+      "setup": "paper/main.tex states 'accuracy improved from 0.71 to 0.80' in the Results section as a literal and uses \\accA for the same quantity elsewhere. paper/numbers.tex defines \\accA as 0.78, taken from results/exp3.json. The abstract also contains a literal 1.07 that appears in no result file.",
+      "expected_output": "Runs scripts/check_numbers.py with the numbers file and results directory. Reports 0.80 as a literal that is not a macro and appears in no result file or differs from the macro, and reports 1.07 as unsourced. Does not edit results/exp3.json. Proposes replacing literals with macros and, where the macro value disagrees with the prose, flags the disagreement for the author rather than silently choosing a number. Records the decision in LAB_LOG.md and ends with the four-part output contract.",
+      "assertions": [
+        "0.80 is flagged as a stale or non-macro literal",
+        "1.07 is flagged as appearing in no result file",
+        "The disagreement between 0.80 and the 0.78 macro is shown to the user",
+        "results/exp3.json is unchanged",
+        "No number is changed without the user being told"
+      ]
+    },
+    {
+      "id": "task_c_humanize",
+      "mode": "humanize",
+      "prompt": "Humanize this paragraph from the discussion section. It has to keep the hedge and the citation.",
+      "setup": "Input paragraph: 'It is worth noting that, in today's rapidly evolving landscape, our method may improve calibration on held-out data (Smith et al., 2021), showcasing its pivotal role. Furthermore, it is not merely an optimisation, but a paradigm shift. In conclusion, these results underscore the importance of calibration.' The user states that numbers and citations are already frozen.",
+      "expected_output": "Reads references/humanize.md, edits structure and staging before vocabulary, removes the throat-clearing opener, the inflated significance, the not-merely-but construction and the closing loop, and keeps 'may improve' and the citation 'Smith et al., 2021' unchanged. Runs scripts/verify_rewrite.py on source and rewrite and shows that it reports no DROPPED or ADDED facts. States that this edits style and does not certify authorship. Ends with the four-part output contract.",
+      "assertions": [
+        "The word 'may' (or an equivalent hedge) survives next to the improvement claim",
+        "The citation key or text 'Smith et al., 2021' survives exactly",
+        "verify_rewrite.py was run and its result is shown",
+        "At least three AI patterns from the source paragraph are removed",
+        "No new factual claim is added",
+        "The response does not promise to evade AI detectors"
+      ]
+    }
+  ]
+}

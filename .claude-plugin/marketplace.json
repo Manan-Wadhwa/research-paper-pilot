@@ -1,0 +1,20 @@
+{
+  "name": "research-paper-pilot",
+  "owner": {
+    "name": "punctualprocrastinator"
+  },
+  "metadata": {
+    "description": "A single-skill marketplace for research-paper-pilot.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "research-paper-pilot",
+      "source": "./",
+      "description": "Takes a research project to a submitted paper in ten modes, with project memory kept in the project itself.",
+      "version": "0.1.0",
+      "license": "MIT",
+      "skills": ["./skills/research-paper-pilot"]
+    }
+  ]
+}
