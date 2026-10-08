@@ -1,4 +1,4 @@
-# Style rules for research papers (W1 to W60)
+# Style rules for research papers (W1 to W77)
 
 The shared rulebook behind the write, humanize, review and revise modes. Each rule has an id so
 that reports, gate output and reviewer findings can point at it ("violates W42"). Every rule gives
@@ -19,6 +19,8 @@ decision log and move on, because these are working rules and not laws.
 - De-AI pass: W48 to W52
 - Venue and LaTeX: W53 to W56
 - Review before submission: W57 to W60
+- Rules from the classic guides: W61 to W72
+- Readable without a glossary: W73 to W77
 - How the mechanical gate uses these rules
 
 ## Settled points
@@ -36,6 +38,8 @@ skill; an author profile may override them for one author, nothing else may.
 | Conclusion-style headings | Allowed where the venue accepts them; use topic headings where it does not. | W46 |
 | Restating results | A conclusion states the moral, not a recap; a short summary section the venue requires is the exception. | W30, W50 |
 | First person | "We" is the default for choices and findings. The author profile may change it. | W41 |
+| Glossaries | The paper never needs one. Terms are explained where they enter; the team's glossary stays in the project context. | W73 |
+| Numbers in prose | The one to three that carry the sentence's claim, after the words that say what they show. The rest go in a table. | W74 |
 
 ## Before writing
 
@@ -105,8 +109,8 @@ third paragraph, so the paper competes on the question and not on the tool.
 ## Background, methods, results
 
 **W17** Include background only if it is essential, not new, and unfamiliar to the reader; define
-terms before use because readers have less context than authors think. A glossary in the appendix
-is fine for the rest.
+terms before use because readers have less context than authors think. Do not lean on a glossary:
+a term the reader needs is explained where it enters (W73).
 
 **W18** Write the methods so a stranger could re-implement them: data, hyperparameters, seeds,
 compute, preprocessing, evaluation protocol. Put final design choices here and ablations with the
@@ -300,10 +304,25 @@ Added after checking the skill against the standard reading list in `sources.md`
 - **W71 Reserve the heavy labels.** Call something a theorem only if it is a main contribution, a proposition if it is a non-trivial intermediate step, a lemma if routine; re-state a variable's meaning when it returns after a gap.
 - **W72 Shorten by tightening before anything else.** To fit a page limit: cut words that say the same thing, remove lines that carry only a few words, condense sections long for their point, then drop redundant figures, then fix layout gaps; negative spacing and supplementary material come last.
 
+## Readable without a glossary
+
+These rules exist because careful, honest papers fail in a predictable way: every name, number,
+caveat and audit detail is correct, and the reader cannot follow any of it. The procedure behind
+W73 is in `glossary-and-plain-language.md`.
+
+- **W73 The paper needs no glossary.** Describe things in plain words by default. Keep a coined name only if the concept recurs across sections, no phrase of about four words says it, and the name describes itself; the main text asks the reader to carry three or four such names and acronyms at most. Never use letter codes for conditions, arms, runs or instruments in prose, and spell out any short labels a table uses in its caption. Introduce each condition, control and measure by its role (what it is, what it rules out, what to expect if the claim holds) in running text where it enters, and remind the reader what a name means when it returns after a gap.
+- **W74 Words before numbers.** Each sentence says in words what a comparison shows, then gives the one to three numbers that carry it; every other value goes in a table the sentence points to. Every Results paragraph keeps at least one sentence that ties its numbers to the claim they support. Pointing at what a number supports is not interpretation, so it stays even where Discussion holds the mechanism (see S6 in `ai-patterns-academic.md`).
+- **W75 Lists only for parallel, separable items.** Datasets, hyperparameters, released artifacts and the contribution list can be lists. Findings, steps of an argument and reasons that depend on each other are prose, because the links between them (because, unless, which rules out) are the content. A list that stays gets a sentence before or after saying what its items add up to.
+- **W76 State each caveat once, where it bites.** A specific caveat stays attached to its claim at the claim's main statement, not repeated at every mention, and the abstract carries at most one. Label a result pre-registered or post hoc once, where it is first reported, and in the claims table; do not restate the label, the bar and the amendment history in every sentence that uses the number.
+- **W77 Provenance lives in the repository, not in the prose.** Every number traces to a file (I1), and the trace is kept in the numbers file, the released code and, if the venue needs it, one compact table. Raw script output, log excerpts, commit hashes, internal file and run names, and amendment dates stay out of the main text; an amendment log, when one is owed, is a short table in the appendix. Every appendix section delivers what its heading promises or is cut.
+
 ## How the mechanical gate uses these rules
 
 `scripts/prose_gate.py` checks the countable subset: dash counts (W49), filler and hype words
 (W42, W44), stacked hedges (W43), same-opener runs and sentence-length statistics (W40, W41), and
-passive voice (W39, reported but never failed in Methods). It cannot judge W1 to W7 or the
+passive voice (W39, reported but never failed in Methods), label codes and the load of coined
+names and acronyms (W73, rule M11), numbers per sentence and paragraph (W74, M12), and lists of
+short fragments in body sections (W75, M13). `check_submission.py` finds stub sections and pasted
+script output (W77). It cannot judge W1 to W7 or the
 structure rules; those need the reviewer agents in `review.md`. Treat its output as a worklist, and
 run it before and after the de-AI pass so the numbers show what changed.

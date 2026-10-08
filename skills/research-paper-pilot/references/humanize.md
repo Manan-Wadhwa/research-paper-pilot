@@ -71,7 +71,7 @@ Then classify each section, because the layers apply differently:
 | Introduction | act | n/a | act | partial | keep one sentence | partial | Open on the gap, not on "in recent years". |
 | Related work | act | n/a | partial | partial | n/a | partial | Group by approach; both-sidesism is allowed here. |
 | Methods | advisory only | n/a | partial | keep | n/a | no | Passive and uniform sentences are conventions; protect. |
-| Results | partial | n/a | partial | partial | n/a | partial | "This section shows" is fine; strip interpretation that belongs in Discussion. |
+| Results | partial | n/a | partial | partial | n/a | partial | "This section shows" is fine; keep the sentence that ties numbers to the claim, move mechanism to Discussion. |
 | Discussion | act | partial | act | partial | n/a | interprets by design | Replace restatement with mechanism or limitation. |
 | Limitations | partial | n/a | partial | partial | n/a | no | Specific limitations stay specific. |
 | Conclusion | partial | allowed with a new element | act | partial | n/a | partial | Must add a limitation, number or next step. |
@@ -114,7 +114,9 @@ Act on a single sighting for these; they are the patterns readers notice conscio
 - Inflated significance [C1] and generic positive closers [C7]: keep the fact, drop the verdict.
 - -ing riders [C3]: keep the fact, drop the rider unless a result supports it.
 - Copula avoidance [V3]: use "is", "are", "has".
-- Over-explaining sentences [S6]: cut, or move the interpretation to Discussion.
+- Over-explaining sentences [S6]: cut the repeats, but keep the one sentence that ties the paragraph's numbers to its claim.
+- Lists standing in for an argument [S17]: rewrite as prose that states the links, keeping every item's facts.
+- Private vocabulary and number dumps [S18, S19]: do not fix here; list them in the report and route to `write` or `revise`, because renaming and moving numbers to a table are content edits.
 - Audit and defensive voice [C18]: state the design fact once, in the section where it is needed; move process detail to Methods or an appendix.
 
 Staging repairs are small. When a repair needs a new fact, stop and ask the author.

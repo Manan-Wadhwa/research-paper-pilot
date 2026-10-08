@@ -7,14 +7,18 @@ figure, an author name in a comment, a page over the limit. This script finds th
 Checks
   refs        every \\ref/\\eqref/\\cref target has a \\label; floats never referenced are flagged
   cites       every \\cite key exists in the .bib files; bib entries never cited are listed
-  markers     [VERIFY], TODO, FIXME, XXX, TBD, \\todo, ??, "to be completed" left in tex or bib
+  markers     [VERIFY], [NUM: ...], [unverified], \\cite{TODO_...}, TODO, FIXME, XXX, TBD, \\todo, ??,
+              "to be completed" left in tex or bib
   figures     every \\includegraphics and \\input file exists; figure files nobody includes
   anonymity   git branch names, remote user/repo names, commit author names and e-mail names, venue
               and workshop names, repo or personal URLs, e-mail addresses, \\thanks and acknowledgements,
               "our previous work" phrasing, style-file options that switch anonymity off, PDF author field
   pages       page count of a compiled PDF versus --venue-pages (references usually excluded; check the CFP)
   checklist   a checklist file or section is present (many venues require one)
+  sections    stub sections (a heading followed by a sentence or two) and long verbatim blocks, which
+              usually mean raw script output pasted into the paper
   log         undefined references and citations reported by a compile log, if one exists
+  layout      overfull boxes from the compile log: text or verbatim running past the margin
 
 Usage
   python check_submission.py paper_dir [--main main.tex] [--venue-pages 9] [--extra-terms "name1,name2"] [--json]
@@ -29,6 +33,7 @@ import re
 import subprocess
 import sys
 
+CATEGORIES = ("refs", "cites", "markers", "figures", "anonymity", "pages", "checklist", "sections", "log", "layout")
 SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "env", "build", "_minted"}
 GENERIC_BRANCHES = {"main", "master", "dev", "develop", "head", "trunk", "gh-pages", "origin"}
 IMG_EXTS = ["", ".pdf", ".png", ".jpg", ".jpeg", ".eps", ".PDF", ".PNG", ".JPG", ".pgf"]
@@ -36,6 +41,9 @@ FIG_FILE_EXTS = {".pdf", ".png", ".jpg", ".jpeg", ".eps", ".svg", ".pgf"}
 VENUES = r"NeurIPS|NIPS|ICML|ICLR|ACL|EMNLP|NAACL|EACL|COLM|CVPR|ICCV|ECCV|AAAI|IJCAI|KDD|TMLR|COLT|AISTATS|UAI|ARR"
 MARKERS = [
     (r"\[VERIFY\]", "[VERIFY] mark"),
+    (r"\[NUM:", "[NUM: ...] placeholder"),
+    (r"(?i)\[unverified\]", "[unverified] mark"),
+    (r"\\cite[a-zA-Z]*\{[^}]*\bTODO_", "\\cite{TODO_...} placeholder"),
     (r"\bTODO\b", "TODO"),
     (r"\bFIXME\b", "FIXME"),
     (r"\bXXX\b", "XXX"),
@@ -51,6 +59,53 @@ SELF_REF = re.compile(
     r"(?i)\b(our|we)\s+(previous|prior|earlier|recent|past)\s+(work|paper|study|studies|preprint|results|publication)|"
     r"\bwe\s+(previously|earlier)\s+(showed|proposed|introduced|reported|found|presented)\b|"
     r"\bin\s+our\s+(companion|previous|earlier)\b")
+
+
+STUB_WORDS = 40
+VERBATIM_LINES = 30
+SECTION_RE = re.compile(r"\\(section|subsection)\*?(?:\[[^\]]*\])?\{([^{}]*)\}")
+
+
+def prose_words(chunk):
+    """Rough count of prose words in a LaTeX chunk (math, commands and braces removed)."""
+    t = re.sub(r"\$[^$]*\$", " ", chunk)
+    t = re.sub(r"\\[a-zA-Z]+\*?(?:\[[^\]]*\])?", " ", t)
+    return len(re.findall(r"[A-Za-z]{2,}", t))
+
+
+def section_issues(lines):
+    """(line, kind, detail) for stub sections and long verbatim blocks in one file."""
+    code = [strip_comment(ln)[0] for ln in lines]
+    out = []
+    heads = []
+    for i, ln in enumerate(code, 1):
+        m = SECTION_RE.search(ln)
+        if m:
+            heads.append((i, m.group(1), m.group(2).strip(), m.end()))
+    for k, (i, kind, title, col) in enumerate(heads):
+        nxt = heads[k + 1] if k + 1 < len(heads) else None
+        if nxt and kind == "section" and nxt[1] == "subsection":
+            continue  # the text lives in the subsections
+        stop = nxt[0] - 1 if nxt else len(code)
+        body = "\n".join([code[i - 1][col:]] + code[i:stop])
+        body = re.split(r"\\end\{document\}|\\bibliography(?:style)?\{|\\printbibliography|\\appendix\b", body)[0]
+        if re.search(r"\\(?:input|include|includegraphics|begin\{(?:figure|table|tabular|verbatim|lstlisting|"
+                     r"algorithm|equation|align|itemize|enumerate))", body):
+            continue
+        n = prose_words(body)
+        if n < STUB_WORDS:
+            out.append((i, "stub", "%s '%s' has %d words of text; deliver what the heading promises or cut it" %
+                        (kind, title, n)))
+    start = None
+    for i, ln in enumerate(code, 1):
+        if re.search(r"\\begin\{(?:verbatim|Verbatim|lstlisting|minted|alltt)\}", ln):
+            start = i
+        elif start and re.search(r"\\end\{(?:verbatim|Verbatim|lstlisting|minted|alltt)\}", ln):
+            if i - start - 1 >= VERBATIM_LINES:
+                out.append((start, "verbatim", "verbatim block of %d lines; raw script output belongs in the "
+                            "released code, with a pointer in the paper" % (i - start - 1)))
+            start = None
+    return out
 
 
 def read_text(path):
@@ -381,6 +436,11 @@ def main():
     else:
         add("pages", "info", "no compiled PDF found; compile and rerun to check the page count" + ("" if a.venue_pages else " (give --venue-pages)"))
 
+    # ---- sections: stubs and pasted output
+    for p, lines in src.items():
+        for i, kind, msg in section_issues(lines):
+            add("sections", "warn", msg, rel(root, p), i, lines[i - 1].strip())
+
     # ---- checklist
     chk = [p for p in list_files(root, {".tex", ".md", ".txt", ".pdf"}) if re.search(r"(?i)checklist", os.path.basename(p))]
     in_text = any(re.search(r"(?i)paper checklist|reproducibility checklist|responsible nlp", read_text(p)) for p in tex_files)
@@ -394,12 +454,21 @@ def main():
     if os.path.isfile(logp):
         lg = read_text(logp)
         und = len(re.findall(r"LaTeX Warning: (?:Reference|Citation) `[^']*' .*undefined", lg))
-        ovf = len(re.findall(r"Overfull \\hbox", lg))
-        add("log", "warn" if und else "info", "compile log: %d undefined reference/citation warning(s), %d overfull hbox" % (und, ovf))
+        ovf = re.findall(r"Overfull \\hbox \(([0-9.]+)pt too wide\) (?:in paragraph|detected) at lines? ([0-9]+)", lg)
+        add("log", "warn" if und else "info", "compile log: %d undefined reference/citation warning(s), %d overfull hbox" % (und, len(ovf)))
+        wide = sorted(((float(w), int(l)) for w, l in ovf if float(w) > 10.0), reverse=True)
+        for w, l in wide[:10]:
+            add("layout", "warn", "overfull hbox %.0fpt too wide (the log names source line %d of the file being "
+                "typeset): text runs past the margin" % (w, l))
+        if len(wide) > 10:
+            add("layout", "warn", "%d more overfull boxes wider than 10pt" % (len(wide) - 10))
+    else:
+        add("layout", "info", "no compile log next to the main file; text running past the margin was not checked")
 
     manual = ["LLM-use disclosure: not machine-checkable; follow the venue policy",
               "page limit, margins and font: confirm against the official call for papers (record URL and date)",
               "supplementary files and code links: confirm they are anonymised too",
+              "render every page of the PDF and look at it: clipped figure text, tables or verbatim past the margin, empty sections",
               "read the PDF aloud once; fresh-reader pass before upload"]
 
     counts = {}
@@ -421,10 +490,10 @@ def main():
     print("git repo: %s; repo-derived anonymity terms: %d" % ("yes" if top else "no", summary["anonymity_terms_from_git"]))
     print("")
     print("%-10s %6s %6s %6s" % ("category", "error", "warn", "info"))
-    for cat in ("refs", "cites", "markers", "figures", "anonymity", "pages", "checklist", "log"):
+    for cat in CATEGORIES:
         c = counts.get(cat, {"error": 0, "warn": 0, "info": 0})
         print("%-10s %6d %6d %6d" % (cat, c["error"], c["warn"], c["info"]))
-    for cat in ("refs", "cites", "markers", "figures", "anonymity", "pages", "checklist", "log"):
+    for cat in CATEGORIES:
         items = [h for h in hits if h["category"] == cat]
         if not items:
             print("\n[%s] clean" % cat)

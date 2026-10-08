@@ -18,6 +18,12 @@ Rules (ids are stable so reports can cite them)
   M8  rule-of-three density (single-word triads)
   M9  staging tells: "not just X but Y", "serves as", inflated -ing riders
   M10 passive voice counts by section (reported, never a finding in protected sections)
+  M11 reader load: label codes for conditions or instruments ("HA", "I5", "ORG-B"), and more
+      coined names plus acronyms than the reader can hold (--term-budget); a coined name is a
+      phrase set in italics at its first use and reused at least twice
+  M12 number density: sentences and paragraphs that carry more numbers than a reader can follow
+  M13 lists standing in for an argument: three or more short fragments in a body section, or a
+      section whose text is mostly list items (contribution lists are exempt)
 
 Academic mode (--academic) loosens thresholds and exempts what papers need:
   passive voice in Methods and appendices, one roadmap sentence, "not only ... but
@@ -26,6 +32,7 @@ Academic mode (--academic) loosens thresholds and exempts what papers need:
 Usage
   python prose_gate.py paper/main.tex --academic
   python prose_gate.py draft.md --json > gate.json
+  python prose_gate.py paper/main.tex --academic --allow-terms ECE,OOD --term-budget 3
 
 Exit codes: 0 normally; 2 if the input cannot be read; 1 only with --fail-on-findings.
 Python 3.9+, standard library only.
@@ -119,13 +126,49 @@ UNWRAP_RE = re.compile(r"\\[a-zA-Z]+\*?(?:\[[^\]]*\])?\{([^{}]*)\}")
 LEFTOVER_CMD_RE = re.compile(r"\\[a-zA-Z]+\*?")
 
 
+def math_token(m):
+    """Placeholder for inline math: NUMMATH if it holds a digit, else MATH."""
+    return ("NUMMATH" if re.search(r"\d", m.group(0)) else "MATH") + nl(m.group(0))
+
+
+EMPH_TEX_RE = re.compile(r"\\(?:emph|textit|textsl)\{([A-Za-z][A-Za-z \-]{1,38})\}")
+EMPH_MD_RE = re.compile(r"(?<![\w*])[*_]([A-Za-z][A-Za-z \-]{1,38})[*_](?![\w*])")
+
+
+LIST_TEX_RE = re.compile(r"\\begin\{(itemize|enumerate|description)\}(.*?)\\end\{\1\}", re.S)
+
+
+def latex_lists(s):
+    """(start_line, end_line, item_word_counts, lead_text) for each list environment."""
+    out = []
+    prev_end = 0
+    for m in LIST_TEX_RE.finditer(s):
+        items = re.split(r"\\item\b(?:\[[^\]]*\])?", m.group(2))[1:]
+        counts = [len(WORD_RE.findall(inline_clean(it))) for it in items]
+        # the lead-in is the text since the previous list or heading, at most 300 characters
+        lead = inline_clean(s[max(prev_end, m.start() - 300):m.start()].split(BREAK)[-1])
+        prev_end = m.end()
+        out.append((lineno(s, m.start()), lineno(s, m.end()), counts, lead))
+    return out
+
+
+def emphasised(s, pat):
+    """(line, phrase) for each short italic phrase; candidates for coined names."""
+    out = []
+    for m in pat.finditer(s):
+        phrase = collapse(m.group(1)).lower()
+        if 1 <= len(phrase.split()) <= 3:
+            out.append((lineno(s, m.start()), phrase))
+    return out
+
+
 def strip_comments(s):
     return re.sub(r"(?<!\\)%.*", "", s)
 
 
 def inline_clean(s):
     """Clean one chunk of LaTeX body text. Newline count is preserved."""
-    s = MATH_RE.sub(lambda m: "MATH" + nl(m.group(0)), s)
+    s = MATH_RE.sub(math_token, s)
 
     def cite(m):
         name = m.group(1)
@@ -207,13 +250,15 @@ def clean_latex(raw):
     if am:
         appendix_line = lineno(s, am.start())
         s = s[:am.start()] + BREAK + s[am.end():]
+    emph = emphasised(s, EMPH_TEX_RE)
+    lists = latex_lists(s)
     s = re.sub(r"\\item\b(?:\[[^\]]*\])?", BREAK, s)
     s = re.sub(r"\\begin\{minipage\}(?:\[[^\]]*\])?\{[^}]*\}", BREAK, s)
     s = re.sub(r"\\(?:begin|end)\{[^}]*\}(?:\[[^\]]*\])?", BREAK, s)
     text = inline_clean(s)
     caps = [(ln, inline_clean(t)) for ln, t in captions]
     headings.sort()
-    return text, headings, caps, appendix_line
+    return text, headings, caps, appendix_line, {"emph": emph, "lists": lists}
 
 
 def clean_markdown(raw):
@@ -226,8 +271,22 @@ def clean_markdown(raw):
                 break
     out = []
     headings = []
+    lists = []
+    cur_list = None
+    prev_text = ""
     in_code = False
     for ln, line in enumerate(lines, 1):
+        bullet = re.match(r"^\s*(?:[-*+]|\d+[.)])\s+(.*)", line) if not in_code else None
+        if bullet and not re.match(r"^\s*([-*_]\s*){3,}$", line):
+            if cur_list is None:
+                cur_list = [ln, ln, [], prev_text]
+                lists.append(cur_list)
+            cur_list[1] = ln
+            cur_list[2].append(len(WORD_RE.findall(bullet.group(1))))
+        elif line.strip() and not line.startswith(("  ", "\t")):
+            cur_list = None
+        if line.strip() and not bullet:
+            prev_text = line
         if re.match(r"^\s*(```|~~~)", line):
             in_code = not in_code
             out.append(BREAK)
@@ -257,8 +316,9 @@ def clean_markdown(raw):
     s = re.sub(r"\((?:[A-Z][A-Za-z\-]+(?:\s+et al\.|\s+and\s+[A-Z][A-Za-z\-]+)?,?\s+\d{4}[a-z]?(?:;[^)]*)?)\)",
                CITE_P, s)
     s = CITE_RE.sub(lambda m: CITE_P + nl(m.group(0)), s)
-    s = MATH_RE.sub(lambda m: "MATH" + nl(m.group(0)), s)
+    s = MATH_RE.sub(math_token, s)
     s = re.sub(r"(\*\*|__)(.+?)\1", r"\2", s)
+    emph = emphasised(s, EMPH_MD_RE)
     s = re.sub(r"(?<![\w*])[*_]([^*_\n]+)[*_](?![\w*])", r"\1", s)
     s = s.replace("---", EM).replace(" -- ", " " + EM + " ")
     s = re.sub(r"(?<=\w)--(?=\w)", EN, s)
@@ -271,7 +331,7 @@ def clean_markdown(raw):
     for ln, lv, title in headings:
         if lv <= top:
             heads.append((ln, 1, title))
-    return s, heads, [], None
+    return s, heads, [], None, {"emph": emph, "lists": [tuple(x) for x in lists]}
 
 
 # --------------------------------------------------------------------------
@@ -416,8 +476,8 @@ HYPE_RE = re.compile(r"\b(?:" + HYPE_WORDS + r")\b", re.I)
 SIGNIF_RE = re.compile(r"\bsignifican(?:t|tly)\b", re.I)
 TEST_RE = re.compile(
     r"\b(?:p\s*[<=>]|p-value|t-test|test|tests|ci|confidence interval|bootstrap|wilcoxon|permutation|anova|"
-    r"mann-whitney|chi-square|fdr|bonferroni|tost|mixed model|regression|effect size|MATH)\b"
-    r"|\bMATH\b", re.I)
+    r"mann-whitney|chi-square|fdr|bonferroni|tost|mixed model|regression|effect size|MATH|NUMMATH)\b"
+    r"|\b(?:NUM)?MATH\b", re.I)
 CONNECTIVE_RE = re.compile(
     r"^(?:however|moreover|furthermore|additionally|in addition|overall|consequently|therefore|thus|"
     r"nevertheless|nonetheless|importantly|notably|in summary|in conclusion|taken together|ultimately)\b", re.I)
@@ -438,6 +498,25 @@ PASSIVE_RE = re.compile(
 NOT_PARTICIPLE = {"need", "indeed", "speed", "seed", "feed", "bleed", "hundred", "embed", "red", "bed",
                   "proceed", "exceed", "succeed", "shed", "sacred", "naked", "wicked", "supposed", "interested",
                   "worried", "excited", "pleased", "scared"}
+# M11: codes and coined names. A label code is a capitalised token the text never expands
+# ("HA", "I5", "ORG-B", "H-probe"); an acronym is one introduced as "words (ABC)".
+CODE_RE = re.compile(r"\b(?:[A-Z][A-Z0-9]*[0-9][A-Za-z0-9]*|[A-Z]{2,6}s?|[A-Z][A-Z0-9]*-[A-Z0-9][A-Za-z0-9]*|"
+                     r"[A-Z]-[a-z]{2,})\b")
+PLACEHOLDERS = {"MATH", "NUMMATH", "REF", "URL", "NAME", "AUTHORS", "CODE"}
+COMMON_CODES = set("""
+AI ML NLP CV LLM LM VLM MLLM RL RLHF RLAIF DPO PPO GRPO SFT KL GPU TPU CPU API CNN RNN LSTM GRU MLP
+GAN VAE GPT BERT SGD ADAM ROC AUC AUROC PR CI SD SE SEM IQR ANOVA PCA SVD SVM ICA OLS MLE MAP
+USA US UK EU UN DNA RNA PCR MRI FMRI EEG ECG PDF URL HTML JSON CSV ID IID OOD MSE MAE RMSE BLEU
+ROUGE F1 TF IDF QA COVID WHO NIH NSF OK MNIST CIFAR COCO GLUE SQUAD MMLU GSM8K IMDB SST WMT ARC
+A100 H100 V100 FLOP FLOPS TB GB MB KB CUDA LORA PEFT RAG CoT NB TODO
+""".split())
+SMALL_WORDS = {"of", "the", "and", "for", "in", "on", "to", "a", "an", "with", "by"}
+STRESS_WORDS = set("""
+not only all any every each no none never always should must could would might may can will
+before after same different more less most least is are was were be been has have had do does
+did this that these those it its we our they their both either neither also even still very
+""".split())
+NUM_TOKEN_RE = re.compile(r"(?<![A-Za-z0-9.])[\u2212+\-]?\d+(?:[.,]\d+)*(?:/\d+)?%?")
 METHODS_RE = re.compile(r"method|set-?up|materials|implementation|experimental (?:design|setting|protocol)|"
                         r"procedure|datasets?|data and|training|protocol|approach", re.I)
 
@@ -472,7 +551,156 @@ def section_of(headings, appendix_line, line):
     return name, app
 
 
-def analyse(text, headings, captions, appendix_line, args):
+def code_key(tok):
+    """Normalised form for the common-code list: upper case, plural s dropped."""
+    k = tok.upper()
+    return k[:-1] if len(k) > 2 and k.endswith("S") and tok[-1] == "s" else k
+
+
+def is_expanded(code, before):
+    """True if `before` ends with words whose initials spell `code`, as in
+    'expected calibration error (' followed by 'ECE'."""
+    letters = code[:-1] if code.endswith("s") else code
+    if not letters.isalpha():
+        return False
+    initials = []
+    for w in re.findall(r"[A-Za-z]+(?:-[A-Za-z]+)*", before)[-(len(letters) + 4):]:
+        for part in w.split("-"):
+            if part.lower() not in SMALL_WORDS:
+                initials.append(part[0].upper())
+    return "".join(initials[-len(letters):]) == letters.upper()
+
+
+def phrase_re(phrase):
+    body = r"\s+".join(re.escape(w) for w in phrase.split())
+    return re.compile(r"(?<![A-Za-z])" + body + r"(?:s|es)?(?![A-Za-z])", re.I)
+
+
+def reader_load(paras, emph, args):
+    """M11: the names and codes a reader must carry through the main text.
+    Returns (findings, inventory)."""
+    acad = args.academic
+    allowed = {code_key(t.strip()) for t in (args.allow_terms or "").split(",") if t.strip()}
+    main = [p for p in paras if p.kind == "body" and not p.appendix]
+    findings = []
+
+    codes = {}
+    for p in main:
+        for m in CODE_RE.finditer(p.text):
+            tok = m.group(0)
+            key = code_key(tok)
+            if (tok in PLACEHOLDERS or key in COMMON_CODES or key in allowed
+                    or re.fullmatch(r"[IVX]+", tok)):
+                continue
+            c = codes.setdefault(tok, {"uses": 0, "first_line": p.line_at(m.start()), "section": p.section,
+                                       "expanded": False, "paras": set()})
+            c["uses"] += 1
+            c["paras"].add(id(p))
+            before = p.text[:m.start()].rstrip()
+            if before.endswith("(") and is_expanded(tok, before[:-1]):
+                c["expanded"] = True
+
+    first_emph = {}
+    for ln, phrase in emph:
+        words = phrase.split()
+        if all(w in STRESS_WORDS for w in words) or code_key(phrase) in allowed:
+            continue
+        if phrase not in first_emph or ln < first_emph[phrase]:
+            first_emph[phrase] = ln
+    coined = {}
+    for phrase, eln in first_emph.items():
+        rx = phrase_re(phrase)
+        uses, first, paras_with = 0, None, set()
+        for p in main:
+            for m in rx.finditer(p.text):
+                uses += 1
+                paras_with.add(id(p))
+                ln = p.line_at(m.start())
+                if p.section.lower().startswith("abstract"):
+                    continue
+                if first is None or ln < first[0]:
+                    first = (ln, p.section)
+        # a coined name is italicised where the body first uses it (the abstract often uses
+        # it earlier, undefined) and is then reused
+        if first and first[0] == eln and uses >= 3:
+            coined[phrase] = {"uses": uses, "first_line": eln, "section": first[1], "paras": paras_with}
+
+    labels = {t: c for t, c in codes.items() if not c["expanded"]}
+    acronyms = {t: c for t, c in codes.items() if c["expanded"] and c["uses"] >= 2}
+    for tok, c in sorted(labels.items(), key=lambda kv: -kv[1]["uses"]):
+        findings.append(Finding("M11", c["first_line"], c["section"],
+                                "label code '%s' used %d time(s) and never spelled out; name the thing in "
+                                "words (or pass --allow-terms if it is standard in the field)" % (tok, c["uses"]),
+                                ""))
+    load = sorted(coined) + sorted(acronyms)
+    if len(load) > args.term_budget:
+        findings.append(Finding("M11", 0, "(document)",
+                                "%d coined names and acronyms to remember (budget %d): %s; replace all but the "
+                                "few the argument needs with plain descriptions" %
+                                (len(load), args.term_budget, ", ".join(load)), ""))
+    soup_lim = 5 if acad else 4
+    for p in main:
+        present = [t for t, c in codes.items() if id(p) in c["paras"]]
+        present += [t for t, c in coined.items() if id(p) in c["paras"]]
+        if len(present) >= soup_lim:
+            findings.append(Finding("M11", p.start_line, p.section,
+                                    "%d names or codes in one paragraph (%s); the reader has to translate "
+                                    "before reading" % (len(present), ", ".join(sorted(present))), p.text))
+
+    def rows(d):
+        return [{"term": t, "uses": c["uses"], "first_line": c["first_line"]}
+                for t, c in sorted(d.items(), key=lambda kv: kv[1]["first_line"])]
+    inventory = {"coined_names": rows(coined), "label_codes": rows(labels), "acronyms": rows(acronyms),
+                 "term_budget": args.term_budget, "load": len(load)}
+    return findings, inventory
+
+
+INDEX_RE = re.compile(r"\b(?:layers?|heads?|seeds?|epochs?|steps?|tables?|figures?|figs?\.|sections?|"
+                      r"appendix|eqs?\.|equations?|rows?|columns?|lines?)\s+\d{1,3}\b"
+                      r"|\b\d{2}\s*%\s*(?:CI|confidence|credible)", re.I)
+
+
+def count_numbers(s):
+    """Numbers a reader must hold: values, not indices (layer 6, Table 2) or the CI level."""
+    s = INDEX_RE.sub(" ", s)
+    return len(NUM_TOKEN_RE.findall(s)) + s.count("NUMMATH")
+
+
+CONTRIB_RE = re.compile(r"contribut|we (?:make|offer|provide|present) the following|in summary, we", re.I)
+
+
+def list_findings(paras, lists, headings, appendix_line, args):
+    """M13: lists used where the text needed an argument."""
+    findings = []
+    list_words = defaultdict(int)
+    for start, end, counts, lead in lists:
+        sec, app = section_of(headings, appendix_line, start)
+        if app or (args.academic and METHODS_RE.search(sec)):
+            continue
+        list_words[sec] += sum(counts)
+        if CONTRIB_RE.search(lead[-200:]):
+            continue
+        if len(counts) >= 3 and statistics.median(counts) < 12:
+            findings.append(Finding("M13", start, sec,
+                                    "list of %d short fragments (median %d words); if the items depend on each other, "
+                                    "write prose that says how, and say what the list adds up to" %
+                                    (len(counts), statistics.median(counts)), ""))
+    prose_words = defaultdict(int)
+    for p in paras:
+        if p.kind == "body":
+            prose_words[p.section] += len(words_of(p.text))
+    for sec, lw in list_words.items():
+        total = prose_words.get(sec, 0)
+        if total >= 80 and lw / total > 0.4:
+            findings.append(Finding("M13", 0, sec,
+                                    "%d%% of this section's words are list items; a paper argues in paragraphs" %
+                                    round(100.0 * lw / total), ""))
+    return findings
+
+
+def analyse(text, headings, captions, appendix_line, args, extras=None):
+    extras = extras or {}
+    emph = extras.get("emph", [])
     paras = build_paragraphs(text)
     for p in paras:
         p.section, app = section_of(headings, appendix_line, p.start_line)
@@ -544,6 +772,8 @@ def analyse(text, headings, captions, appendix_line, args):
         first_words = []
         triads = 0
         riders2 = 0
+        para_nums = 0
+        sent_lim = 6 if acad else 5
         for off, sent in sents:
             s = collapse(sent)
             ln = p.line_at(off)
@@ -578,7 +808,7 @@ def analyse(text, headings, captions, appendix_line, args):
             # M8 triads
             for tm in TRIAD_RE.finditer(sl):
                 items = tm.groups()
-                if not any(i in ("math", "ref", "url", "authors", "name") for i in items):
+                if not any(i in ("math", "nummath", "ref", "url", "authors", "name") for i in items):
                     triads += 1
             # M9
             if NOT_JUST_RE.search(s) or (not acad and NOT_ONLY_RE.search(s)):
@@ -591,6 +821,13 @@ def analyse(text, headings, captions, appendix_line, args):
                                         "inflated -ing rider (%s); cut it or make it a claim with evidence" %
                                         rm.group(0).strip(", "), s))
             riders2 += len(RIDER2_RE.findall(s))
+            # M12 numbers per sentence
+            nn = count_numbers(s)
+            para_nums += nn
+            if nn >= sent_lim and not p.protected:
+                findings.append(Finding("M12", ln, p.section,
+                                        "%d numbers in one sentence; keep the one or two that carry the claim, "
+                                        "say in words what they show, move the rest to a table" % nn, s))
             # M10 passive
             pm = PASSIVE_RE.search(s)
             if pm and pm.group(1).lower() not in NOT_PARTICIPLE:
@@ -598,6 +835,11 @@ def analyse(text, headings, captions, appendix_line, args):
                 if not p.protected:
                     findings.append(Finding("M10", ln, p.section, "passive voice", s))
         # paragraph-level rules
+        para_lim = 15 if acad else 12
+        if para_nums >= para_lim and not p.protected:
+            findings.append(Finding("M12", p.start_line, p.section,
+                                    "%d numbers in one paragraph; a reader cannot hold them, so state the finding "
+                                    "in words and move the values to a table" % para_nums, p.text))
         if triads >= (3 if acad else 2):
             findings.append(Finding("M8", p.start_line, p.section,
                                     "%d single-word triads in one paragraph" % triads, p.text))
@@ -656,7 +898,10 @@ def analyse(text, headings, captions, appendix_line, args):
                                         (cv, cv_floor, len(L)), ""))
         elif len(L) >= 2:
             st["cv"] = statistics.pstdev(L) / statistics.mean(L)
-    return paras, findings, sec_stats, para_dashes, all_lengths
+    load_findings, inventory = reader_load(paras, emph, args)
+    findings.extend(load_findings)
+    findings.extend(list_findings(paras, extras.get("lists", []), headings, appendix_line, args))
+    return paras, findings, sec_stats, para_dashes, all_lengths, inventory
 
 
 # --------------------------------------------------------------------------
@@ -674,10 +919,11 @@ def stats_of(L):
 def main(argv=None):
     ap = argparse.ArgumentParser(
         description="Mechanical prose gate for LaTeX, Markdown or text drafts. Advisory: prints findings "
-                    "with rule ids M1..M10 and line numbers; exits 0 unless the file cannot be read.",
+                    "with rule ids M1..M13 and line numbers; exits 0 unless the file cannot be read.",
         epilog="Rules: M1 em dashes, M2 pompous words, M3 throat-clearing and vague attribution, M4 hype and "
                "unsupported 'significant', M5 stacked hedges, M6 repeated openers, M7 uniform sentence length, "
-               "M8 triads, M9 staging tells, M10 passive voice.")
+               "M8 triads, M9 staging tells, M10 passive voice, M11 reader load (codes and coined names), "
+               "M12 number density, M13 lists standing in for an argument.")
     ap.add_argument("file", help="path to a .tex, .md or .txt file")
     ap.add_argument("--academic", action="store_true",
                     help="academic exemptions: passive in Methods/appendix, one roadmap, looser thresholds")
@@ -686,6 +932,10 @@ def main(argv=None):
     ap.add_argument("--max-per-rule", type=int, default=12, help="findings printed per rule (default 12)")
     ap.add_argument("--all", action="store_true", help="print every finding")
     ap.add_argument("--show-passive", action="store_true", help="also list passive sentences in protected sections")
+    ap.add_argument("--term-budget", type=int, default=4,
+                    help="coined names plus acronyms a reader is asked to remember in the main text (default 4)")
+    ap.add_argument("--allow-terms", default="",
+                    help="comma-separated codes or names that are standard in the field and need no rewording")
     ap.add_argument("--json", action="store_true", help="emit JSON instead of the text report")
     ap.add_argument("--fail-on-findings", action="store_true", help="exit 1 if any finding remains (for CI use)")
     args = ap.parse_args(argv)
@@ -711,11 +961,12 @@ def main(argv=None):
         else:
             fmt = "markdown"
     if fmt == "latex":
-        text, headings, captions, appendix_line = clean_latex(raw)
+        text, headings, captions, appendix_line, extras = clean_latex(raw)
     else:
-        text, headings, captions, appendix_line = clean_markdown(raw)
+        text, headings, captions, appendix_line, extras = clean_markdown(raw)
 
-    paras, findings, sec_stats, para_dashes, all_lengths = analyse(text, headings, captions, appendix_line, args)
+    paras, findings, sec_stats, para_dashes, all_lengths, inventory = analyse(
+        text, headings, captions, appendix_line, args, extras)
     if not args.show_passive:
         findings = [f for f in findings if not (f.rule == "M10" and sec_stats[f.section]["protected"])]
     # passive findings only when a section's share is high
@@ -749,6 +1000,7 @@ def main(argv=None):
                        "cv": round(stats_of(st["lengths"])[2], 3),
                        "passive": st["passive"], "em_dashes": st["em"], "protected": st["protected"]}
                 for name, st in sec_stats.items()},
+            "reader_load": inventory,
             "findings": [f.as_dict() for f in findings],
         }
         print(json.dumps(out, indent=2, ensure_ascii=False))
@@ -759,7 +1011,7 @@ def main(argv=None):
           (n_words, sum(1 for p in paras if p.kind == "body"), n_sents, mean, sd, cv))
     names = {"M1": "em dash", "M2": "pompous words", "M3": "openers/attribution", "M4": "hype/significance",
              "M5": "stacked hedges", "M6": "repeated openers", "M7": "uniform length", "M8": "triads",
-             "M9": "staging", "M10": "passive"}
+             "M9": "staging", "M10": "passive", "M11": "reader load", "M12": "number density", "M13": "lists"}
     print("findings: %d (advisory)  %s" % (len(findings),
           " | ".join("%s %s %d" % (r, names[r], counts[r]) for r in sorted(counts, key=lambda x: int(x[1:])))))
     print()
@@ -786,6 +1038,15 @@ def main(argv=None):
     tp = sum(st["passive"] for st in sec_stats.values())
     print("  %-34s %5s %5d %6.1f %5.2f %7d %5.0f%%" %
           ("ALL", "", n_sents, mean, cv, tp, 100.0 * tp / n_sents if n_sents else 0))
+    print()
+    print("READER LOAD: NAMES AND CODES THE MAIN TEXT ASKS THE READER TO REMEMBER (budget %d, load %d)" %
+          (inventory["term_budget"], inventory["load"]))
+    for label, key in (("coined names", "coined_names"), ("acronyms", "acronyms"),
+                       ("label codes, never spelled out", "label_codes")):
+        items = inventory[key]
+        shown_items = ", ".join("%s (%d, L%d)" % (r["term"], r["uses"], r["first_line"]) for r in items[:20])
+        more = " (+%d more)" % (len(items) - 20) if len(items) > 20 else ""
+        print("  %-31s %s%s" % (label + ":", shown_items or "none", more))
     print()
     print("FINDINGS")
     cur = None

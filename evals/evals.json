@@ -161,6 +161,21 @@
         "No new factual claim is added",
         "The response does not promise to evade AI detectors"
       ]
+    },
+    {
+      "id": "task_d_plain_language",
+      "mode": "write",
+      "prompt": "Rewrite this results paragraph so a reviewer outside our group can follow it. We do not want a glossary in the paper.",
+      "setup": "Input paragraph: 'On S3, arm A beats arm B by 2.1 points (A 4.2, B 6.3, C 6.0; 5 seeds, 95% CI 1.4 to 2.8), so C rules out the warm-up story; the shield holds on S1 to S3 and the canary stays flat.' paper/PROJECT_CONTEXT.md has a glossary: arm A = model trained with label smoothing; arm B = baseline with no smoothing; arm C = control with the same warm-up schedule as A but no smoothing; S1 to S3 = the blur, noise and contrast shifts; shield = the finding that the gain survives all three shifts; canary = an untouched reference model evaluated with every run.",
+      "expected_output": "Reads references/glossary-and-plain-language.md. Replaces every letter code and metaphor name with a plain description taken from the glossary, introduces the control by its role (it rules out the warm-up schedule as the cause) before reporting its result, states the comparison in words before the numbers, keeps the numbers that carry the claim, and either keeps the remaining values or says they move to a table. Runs scripts/prose_gate.py --academic on the result and shows no label codes in the reader-load block. Does not add a glossary to the paper. Ends with the output contract.",
+      "assertions": [
+        "No 'arm A', 'arm B', 'arm C', 'S1', 'S2', 'S3', 'shield' or 'canary' remains in the rewritten paragraph",
+        "The control's purpose (ruling out the warm-up schedule) is stated before or with its result",
+        "The values 2.1, 4.2, 6.3, 6.0, 5 seeds and the interval 1.4 to 2.8 are either kept or explicitly moved to a table, none silently dropped",
+        "No number is changed",
+        "No glossary is added to the paper",
+        "prose_gate.py was run and its reader-load result is shown"
+      ]
     }
   ]
 }

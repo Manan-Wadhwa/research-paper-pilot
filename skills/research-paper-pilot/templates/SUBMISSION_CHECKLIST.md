@@ -24,19 +24,23 @@ Run `python scripts/check_submission.py paper --venue-pages <N>` and record each
 
 - [ ] Every `\ref` and `\cite` resolves
 - [ ] The bibliography holds only cited entries
-- [ ] No `[VERIFY]`, `TODO`, `XXX` or `FIXME` remains in text, captions or bibliography
+- [ ] No `[VERIFY]`, `[NUM: ...]`, `[unverified]`, `\cite{TODO_...}`, `TODO`, `XXX` or `FIXME` remains in text, captions or bibliography
+- [ ] No stub section and no long verbatim block of pasted script output
 - [ ] Every figure file exists and every figure is referenced in the text
 - [ ] Anonymity grep is clean (names, repository URLs, "our previous work", branch names)
 - [ ] Page count within the limit with the unmodified venue template
 - [ ] `check_numbers.py`: no literal numbers outside macros except allowed constants; each "in no result file" item explained
 - [ ] `verify_citations.py`: no unresolved `mismatch` or `unresolved` entry left unexamined
-- [ ] `prose_gate.py --academic`: findings reviewed
+- [ ] `prose_gate.py --academic`: findings reviewed; no label codes left, coined names within the budget
 - [ ] Clean compile, log read for undefined references and overfull boxes
+- [ ] Every page of the PDF rendered and looked at, appendix included: no clipped figure text, nothing past the margin
 
 ## 3. Content checks
 
 - [ ] Every claim in the abstract and introduction appears in CLAIMS.md with a status that supports its wording
-- [ ] Pre-registered and post hoc results are labelled where they appear
+- [ ] Pre-registered and post hoc results are labelled once, where each is first reported, and in a status table
+- [ ] The paper reads without a glossary: plain words instead of project codes, each condition explained by its role where it enters
+- [ ] A fresh reader given the abstract, introduction and one random Results paragraph can restate its finding
 - [ ] No process voice in prose or captions (paths, run names, "locked", "verified", "PASS", developer commentary)
 - [ ] Limitations stated once as scope, each pointing forward
 - [ ] Figures are readable in grayscale and at column width; captions lead with the takeaway

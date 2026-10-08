@@ -2,7 +2,7 @@
 
 Turns a frozen set of claims and results into a manuscript, section by section. This mode drafts;
 it does not search literature (litreview), judge evidence (evidence) or polish style (humanize).
-Sentence-level rules are in `style-rules.md` and are cited here by id (W1 to W60).
+Sentence-level rules are in `style-rules.md` and are cited here by id (W1 to W77).
 
 ## Contents
 
@@ -12,7 +12,7 @@ Sentence-level rules are in `style-rules.md` and are cited here by id (W1 to W60
 - Step 3: drafting order
 - Section by section
 - Contributions as claims
-- Terminology: glossary first, one term per concept
+- Terminology: plain words first, no reader glossary
 - Venue register switch
 - The rigor section
 - Using one subagent per section
@@ -124,11 +124,18 @@ what the figure shows and what it means, never "see Figure 3" alone (W35). Repor
 W21 and keep nulls next to the effect they control. End each subsection with a takeaway paragraph
 that states the pattern, written so a skim-reader gets the message from it alone (W20).
 
+Write each comparison as words first, then the one to three numbers that carry it, and point to the
+table for the rest (W74). A paragraph that reads "X reads a against b; Y reads c against d" is a
+table in disguise: make the table and keep the sentence that says what it shows. Findings are
+paragraphs, not bullet lists (W75), because the links between them are the argument. State each
+caveat once, where its claim is first reported (W76).
+
 Order by argument. Controls and ablations sit beside the claim they protect, not in a trailing
 section where they look like afterthoughts.
 
-When a result is post hoc, say so where it appears, in plain words ("we found this while checking
-X, so we treat it as exploratory"). Exploratory results are welcome; hidden ones are not.
+When a result is post hoc, say so where it first appears, in plain words ("we found this while
+checking X, so we treat it as exploratory"), and once in the claims table; do not repeat the label in
+every later sentence (W76). Exploratory results are welcome; hidden ones are not.
 
 When an outcome was predicted and failed, say so. A stated half-failure is among the most credible
 sentences a paper can contain.
@@ -172,14 +179,19 @@ experiments" (W14). Two to four contributions is typical. Check each one against
 status must permit the verb. An exploratory claim takes "we observe" or "we find preliminary
 evidence", a supported claim takes "we show", and a retired claim does not appear.
 
-## Terminology: glossary first, one term per concept
+## Terminology: plain words first, no reader glossary
 
-Before drafting, extract the project's working vocabulary from PROJECT_CONTEXT.md's glossary and
-classify each term: used by the field as is, needs a definition at first use, or project-internal
-and must be replaced by a plain phrase. See `glossary-and-plain-language.md` for the procedure.
-Then lock one term per concept for the whole paper (W45). Introduce each acronym once. If a
-reader would need to learn more than a handful of new terms to follow the abstract, the paper is
-asking too much.
+The glossary in PROJECT_CONTEXT.md is for the team; the paper must read without one (W73). Before
+drafting, take each term in that glossary and classify it: used by the field as is, worth keeping
+as a name (it recurs across sections, no short phrase says it, and the name describes itself), or
+to be replaced by a plain description. Project-internal words, letter codes and metaphor names go
+in the last group. The main text keeps three or four coined names and acronyms at most; write the
+plain phrase for each term into the glossary's last column so every section uses the same one. See
+`glossary-and-plain-language.md` for the procedure, the explain-by-role pattern and a worked
+example.
+
+Then lock one term per concept for the whole paper (W45). Introduce each condition, control and
+measure by its role, in prose, where it enters, and re-anchor a name that returns after a gap.
 
 Avoid attributing human mental states to model internals unless the term is defined
 operationally, and then use it consistently (W22).
@@ -227,6 +239,7 @@ the CLAIMS.md rows for that section, the numbers file or macro names, the style 
 the author profile. Require the writer to:
 
 - cite macros, not literals, and list every macro it used;
+- use the plain phrases from the glossary's last column, and report any new name it introduced;
 - return the section plus the list of claim ids it relied on;
 - insert `[VERIFY]` where it wanted a citation it had not been given;
 - avoid forward references to numbers in sections it has not seen.
@@ -246,7 +259,9 @@ accepting the section.
    rather than polishing the old text. Framing decisions are baked into sentence structure and
    survive polishing.
 4. Run `scripts/check_numbers.py` on the draft and fix every flagged literal.
-5. Run `scripts/prose_gate.py --academic` and clear the worklist (W40 to W45, W49).
+5. Run `scripts/prose_gate.py --academic` and clear the worklist (W40 to W45, W49, W73 to W75).
+   Read its reader-load block: every label code goes, and every coined name beyond the budget
+   becomes a description.
 6. Seek outside reading at each stage: an outsider on the three-bullet story, an expert on the
    results, a fresh agent reading only the manuscript (W59, W60). Tell each reader what to focus on.
 7. Read the paper aloud once at the end; double readings and clumsy sentences surface this way.
@@ -266,6 +281,11 @@ accepting the section.
   reported as that, not as a general effect.
 - **Hiding a failed prediction.** Reviewers find it anyway, and the paper looks evasive.
 - **Leaked voices** (W29): file paths, run names, "verified" and "PASS" in the manuscript.
+- **The audit trail written into the prose.** Every number carries its bar, its seed count, its
+  pre-registration status and the date its criterion changed, so no sentence can be read. Keep the
+  trail in the repository and one appendix table (W76, W77); the paper states the result.
+- **A private vocabulary.** Letter codes and nicknames for conditions that the team knows by heart
+  and the reader has to decode every line (W73).
 - **A surviving Draft 0 introduction** that promises what the evaluation cannot deliver (W4).
 
 ## Done check, state updates, output
@@ -273,7 +293,9 @@ accepting the section.
 The draft is ready for review when: every claim in the three-bullet story has a section; every
 number is a macro or a value traced in the numbers file; `check_numbers.py` has no unexplained
 flags; every citation is fetched or marked `[VERIFY]`; the gate worklist is clear or each
-remaining item has a reason; and the venue's page limit is met with the appendix policy known.
+remaining item has a reason; a fresh reader given only the abstract, introduction and one random
+Results paragraph can restate that paragraph's finding without guessing a word; and the venue's page
+limit is met with the appendix policy known.
 
 Append to LAB_LOG.md: "Mode write ran on <date>; produced <files>; decisions: register, claim
 status changes, any claim moved to the appendix; open: [VERIFY] count, pending figures." Update the

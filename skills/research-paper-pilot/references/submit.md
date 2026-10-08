@@ -32,16 +32,18 @@ python scripts/verify_citations.py paper/references.bib --online --out paper/CIT
 python scripts/prose_gate.py paper/main.tex --academic
 ```
 
-`check_submission.py` covers: every `\ref` and `\cite` resolves; the bibliography holds only cited entries; no `[VERIFY]`, `TODO`, `XXX` or `FIXME` remains; figure files exist and are referenced; an anonymity grep for names, repository URLs and phrases like "our previous work"; the page count of a compiled PDF; and whether a checklist file is present. Read its output in full and fix what it finds. A script that cannot run prints a warning; list those warnings in the checklist as "not checked" rather than treating them as passes.
+`check_submission.py` covers: every `\ref` and `\cite` resolves; the bibliography holds only cited entries; no `[VERIFY]`, `TODO`, `XXX` or `FIXME` remains; figure files exist and are referenced; an anonymity grep for names, repository URLs and phrases like "our previous work"; the page count of a compiled PDF; whether a checklist file is present; stub sections and long verbatim blocks of pasted script output; and, from the compile log, overfull boxes where text runs past the margin. Read its output in full and fix what it finds. A script that cannot run prints a warning; list those warnings in the checklist as "not checked" rather than treating them as passes.
 
-Compile the paper from a clean state and read the log for undefined references, overfull boxes and missing fonts. The log, not the PDF's looks, tells you what the venue's build will see.
+Compile the paper from a clean state and read the log for undefined references, overfull boxes and missing fonts. The log tells you what the venue's build will see. Then render every page of the PDF to an image and look at it, appendix included: clipped text inside figures, tables or verbatim running off the page, a section that is only a heading and a sentence, and figure text too small to read at print size. The log misses most of these, and reviewers see all of them.
 
 ## Step 3: the manual checklist
 
 Fill `templates/SUBMISSION_CHECKLIST.md`. Items the scripts cannot decide:
 
 - Every claim in the abstract and introduction is in `CLAIMS.md` with a status that supports its wording; no claim is stronger than its ledger row.
-- Pre-registered versus post hoc results are labelled where they appear.
+- Pre-registered versus post hoc results are labelled once, where each is first reported, and in a status table; the label, bar and amendment history are not repeated in every sentence.
+- The paper reads without a glossary: no letter codes or project nicknames in prose, each condition explained by its role where it enters, and a fresh reader can follow a random Results paragraph after the abstract and introduction (W73).
+- Raw script output, logs, commit hashes and internal file names are in the released code, not pasted into the paper (W77).
 - No leaked process voice: no file paths, run names, "locked", "verified" or "PASS" labels, no developer commentary in the prose or captions.
 - Limitations appear once, as scope, and point forward.
 - Figures read in grayscale and at column width; captions state the takeaway.
