@@ -42,9 +42,9 @@ Build the plan in this order for each candidate figure:
 7. Draft the caption's first sentence (the takeaway) now; it is the claim restated as a finding.
 
 Then check the set as a whole: the figures together should tell the three-bullet story from
-`write.md`, and no claim in CLAIMS.md marked "goes in the paper" may lack a figure or table unless a
-sentence of prose suffices. A paper with more results subsections than ideas has figures driven by
-plotting convenience; merge or cut.
+`write.md`, and no claim in CLAIMS.md whose In paper column is main may lack a figure or table
+unless a sentence of prose suffices. A paper with more results subsections than ideas has figures
+driven by plotting convenience; merge or cut.
 
 ## One claim per figure; Figure 1 is the pitch
 

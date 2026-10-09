@@ -12,7 +12,7 @@
 
 ## How to use this list
 
-Every rule in `style-rules.md`, `write.md` and `evidence.md` was re-expressed from one or more of these sources, or from the agent-skill packs listed in the repository's ATTRIBUTION file. Read a source when a rule needs its full argument, when the user wants the original, or before adding a rule. The "where it lives" column points to the part of this skill that carries the idea. Links were valid in October 2026; pages move, so search by title if one fails.
+Every rule in `style-rules.md`, `write.md` and `evidence.md` was re-expressed from one or more of these sources, or from the agent-skill packs listed in ATTRIBUTION.md at the repository root (not shipped with the skill when installed alone). Read a source when a rule needs its full argument, when the user wants the original, or before adding a rule. The "where it lives" column points to the part of this skill that carries the idea. Links resolved when checked in October 2026, except where a row says otherwise; pages move, so search by title if one fails.
 
 ## Core guides on writing ML papers
 

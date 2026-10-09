@@ -19,15 +19,23 @@
 | | Wording | Date or round | Trigger for the change | Evidence file | Locked in advance? |
 |---|---|---|---|---|---|
 | Original | <quote from the first design note or commit> | | n/a | | |
-| Evolved | | | | | |
+| Evolved 1 | | | | | |
+| Evolved 2 (add one row per shift) | | | | | |
 | Current | | | | | |
 
 ## Headline claim and strength
 
 - Headline: <one sentence>
+- Scope: <models, datasets, populations, regimes it holds for; what it does not cover> (written by hypothesis mode)
 - Strength: <established | supported | equivocal | retired | exploratory>
 - Fallback if the headline is retired: <what the paper becomes>
 - Claims ledger: `paper/CLAIMS.md`
+
+## Closest prior work and scoop check
+
+- Scoop verdict: <none | partial | full> (written by litreview mode)
+- Date checked: <date>
+- Closest papers: <citekey: one line on what they did and how this project differs>, ...
 
 ## Venue, deadline, format
 

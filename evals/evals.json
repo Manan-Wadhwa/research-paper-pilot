@@ -37,11 +37,12 @@
       "id": "t06",
       "query": "turn this repo into a paper. we ran arm A vs arm B on three seeds, notes are in NOTES.md and the figures are rough",
       "should_trigger": true,
-      "expected_mode": "understand"
+      "expected_mode": "understand",
+      "note": "paper/PROJECT_CONTEXT.md does not exist in this setup, so 'turn this into a paper' routes to understand first; with the context file present it would route to write."
     },
     {
       "id": "t07",
-      "query": "can you play reviewer for me? i want the harshest possible read of the draft before the deadline, and also check the neurips checklist",
+      "query": "can you play reviewer for me? i want the harshest possible read of the draft before the deadline",
       "should_trigger": true,
       "expected_mode": "review"
     },
@@ -64,20 +65,35 @@
       "expected_mode": "submit"
     },
     {
+      "id": "t11",
+      "query": "the outline is approved, draft the method section from the context file and claims ledger",
+      "should_trigger": true,
+      "expected_mode": "write"
+    },
+    {
+      "id": "t12",
+      "query": "can you play reviewer for me and give the harshest read of the draft, and also run the neurips checklist and anonymize it for submission",
+      "should_trigger": true,
+      "expected_mode": "ask",
+      "note": "The request spans review and submit. SKILL.md says to ask once which mode to start with and never guess, so pass when the skill triggers and asks which to run first."
+    },
+    {
       "id": "n01",
       "query": "write my fellowship statement, the prompt is 'describe your research vision in 500 words'",
       "should_trigger": false,
-      "expected_alternative": "advocate"
+      "expected_alternative": "a grant, fellowship or application-writing skill"
     },
     {
       "id": "n02",
-      "query": "fix the failing test in train.py, the dataloader returns the wrong shape on the last batch",
-      "should_trigger": false
+      "query": "summarize this arXiv paper for me",
+      "should_trigger": false,
+      "expected_alternative": "general reading help: summarising someone else's paper"
     },
     {
       "id": "n03",
-      "query": "summarize this pdf for me, it is a 40 page company annual report",
-      "should_trigger": false
+      "query": "I'm reviewing a colleague's submission for ICML, help me write my review",
+      "should_trigger": false,
+      "expected_alternative": "general help writing a peer review of someone else's paper"
     },
     {
       "id": "n04",
@@ -99,12 +115,13 @@
       "id": "n07",
       "query": "write a cover letter for a postdoc application at a climate lab",
       "should_trigger": false,
-      "expected_alternative": "advocate"
+      "expected_alternative": "a grant, fellowship or application-writing skill"
     },
     {
       "id": "n08",
-      "query": "explain what attention is and how transformers work, i am preparing for an interview",
-      "should_trigger": false
+      "query": "fix my LaTeX compile error: undefined control sequence \\citep",
+      "should_trigger": false,
+      "expected_alternative": "general LaTeX debugging"
     },
     {
       "id": "n09",
@@ -113,8 +130,9 @@
     },
     {
       "id": "n10",
-      "query": "convert this csv of survey answers to a pandas dataframe and compute the mean per question",
-      "should_trigger": false
+      "query": "plot my training loss curve from wandb logs",
+      "should_trigger": false,
+      "expected_alternative": "general plotting or a data-visualization skill"
     }
   ],
   "task_evals": [
@@ -127,7 +145,9 @@
       "assertions": [
         "PROJECT_INVENTORY.md exists and lists the git authors with commit counts",
         "PROJECT_CONTEXT.md exists and has a one-line Status line",
+        "paper/CLAIMS.md exists, with one row per claim, a status from the ladder and an evidence file pointer",
         "NOTES_v2.md is reported as cited but absent",
+        "The plain-language explainer is written to paper/PROJECT_EXPLAINER.md",
         "Each claim in the explainer has a status from the ladder (established, supported, equivocal, retired, exploratory) and a file pointer",
         "No result file was modified",
         "The reply ends with files written, decisions taken, open items and next recommended mode"
@@ -137,13 +157,14 @@
       "id": "task_b_check_numbers",
       "mode": "evidence",
       "prompt": "Check the numbers in paper/main.tex against our results before I send it.",
-      "setup": "paper/main.tex states 'accuracy improved from 0.71 to 0.80' in the Results section as a literal and uses \\accA for the same quantity elsewhere. paper/numbers.tex defines \\accA as 0.78, taken from results/exp3.json. The abstract also contains a literal 1.07 that appears in no result file.",
-      "expected_output": "Runs scripts/check_numbers.py with the numbers file and results directory. Reports 0.80 as a literal that is not a macro and appears in no result file or differs from the macro, and reports 1.07 as unsourced. Does not edit results/exp3.json. Proposes replacing literals with macros and, where the macro value disagrees with the prose, flags the disagreement for the author rather than silently choosing a number. Records the decision in LAB_LOG.md and ends with the four-part output contract.",
+      "setup": "paper/main.tex states 'accuracy improved from 0.71 to 0.80' in the Results section as literals and uses \\accA for the improved accuracy elsewhere. paper/numbers.tex defines \\accA as 0.78, taken from results/exp3.json. results/exp3.json holds the baseline accuracy 0.71 and the improved accuracy 0.78; the value 0.80 appears in no result file. The abstract also contains a literal 1.07 that appears in no result file.",
+      "expected_output": "Runs scripts/check_numbers.py with the numbers file and results directory. Reports 0.80 as a literal that is not a macro, appears in no result file and differs from the 0.78 macro; reports 0.71 as a literal that matches results/exp3.json and should become a macro; and reports 1.07 as unsourced. Does not edit results/exp3.json. Proposes replacing literals with macros and, where the macro value disagrees with the prose, flags the disagreement for the author rather than silently choosing a number. Records the decision in LAB_LOG.md and ends with the four-part output contract.",
       "assertions": [
         "0.80 is flagged as a stale or non-macro literal",
         "1.07 is flagged as appearing in no result file",
         "The disagreement between 0.80 and the 0.78 macro is shown to the user",
         "results/exp3.json is unchanged",
+        "paper/LAB_LOG.md gains an entry recording the check and the decision taken or left open",
         "No number is changed without the user being told"
       ]
     },
@@ -160,6 +181,21 @@
         "At least three AI patterns from the source paragraph are removed",
         "No new factual claim is added",
         "The response does not promise to evade AI detectors"
+      ]
+    },
+    {
+      "id": "task_d_plain_language",
+      "mode": "write",
+      "prompt": "Rewrite this results paragraph so a reviewer outside our group can follow it. We do not want a glossary in the paper.",
+      "setup": "Input paragraph: 'On S3, arm A beats arm B by 2.1 points (A 4.2, B 6.3, C 6.0; 5 seeds, 95% CI 1.4 to 2.8), so C rules out the warm-up story; the shield holds on S1 to S3 and the canary stays flat.' paper/PROJECT_CONTEXT.md has a glossary: arm A = model trained with label smoothing; arm B = baseline with no smoothing; arm C = control with the same warm-up schedule as A but no smoothing; S1 to S3 = the blur, noise and contrast shifts; shield = the finding that the gain survives all three shifts; canary = an untouched reference model evaluated with every run.",
+      "expected_output": "Reads references/glossary-and-plain-language.md. Replaces every letter code and metaphor name with a plain description taken from the glossary, introduces the control by its role (it rules out the warm-up schedule as the cause) before reporting its result, states the comparison in words before the numbers, keeps the numbers that carry the claim, and either keeps the remaining values or says they move to a table. Runs scripts/prose_gate.py --academic on the result and shows no label codes in the reader-load block. Does not add a glossary to the paper. Ends with the output contract.",
+      "assertions": [
+        "No 'arm A', 'arm B', 'arm C', 'S1', 'S2', 'S3', 'shield' or 'canary' remains in the rewritten paragraph",
+        "The control's purpose (ruling out the warm-up schedule) is stated before or with its result",
+        "The values 2.1, 4.2, 6.3, 6.0, 5 seeds and the interval 1.4 to 2.8 are either kept or explicitly moved to a table, none silently dropped",
+        "No number is changed",
+        "No glossary is added to the paper",
+        "prose_gate.py was run and its reader-load result is shown"
       ]
     }
   ]

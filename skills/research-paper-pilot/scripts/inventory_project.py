@@ -7,7 +7,9 @@ a results inventory, provenance sidecar counts, candidate key documents,
 results folders that no document mentions (orphans) and documents that
 files or commit messages mention but that are absent on disk.
 
-Stdlib only. Run it with `python`. The report is markdown; --json prints the
+Stdlib only. Run it with `python`. The project is only read; the one file
+written is the markdown report (default paper/PROJECT_INVENTORY.md inside the
+project; --out - prints it to stdout and writes nothing). --json prints the
 same data as JSON on stdout. A missing git or an unreadable file produces a
 one-line WARN and the run continues.
 """
@@ -18,18 +20,27 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from collections import Counter, defaultdict
 
 PRUNE_DIRS = {
-    ".git", "node_modules", "venv", ".venv", "env", "__pycache__",
+    ".git", "node_modules", "__pycache__",
     ".ipynb_checkpoints", ".mypy_cache", ".pytest_cache", ".tox",
     "site-packages", ".idea", ".vscode",
 }
+# Pruned only when the folder looks like a Python environment (env/ is also a
+# common name for RL environment code). Any folder holding pyvenv.cfg is pruned.
+VENV_NAMES = {"venv", ".venv", "env", ".env", "virtualenv", "venvs", "envs"}
+VENV_MARKERS = ("pyvenv.cfg", "bin/activate", "Scripts/activate", "Scripts/activate.bat", "conda-meta")
 TEXT_EXTS = {".md", ".tex", ".txt", ".rst"}
 DOC_EXTS = {"md", "tex", "bib", "pdf", "txt", "html", "ipynb", "rst"}
 MENTION_EXTS = DOC_EXTS | {"json", "jsonl", "csv", "py", "yaml", "yml", "sh", "toml", "npy", "pt"}
 MAX_FILES = 400000
+DEFAULT_OUT = "paper/PROJECT_INVENTORY.md"
 MAX_TEXT_BYTES = 2 * 1024 * 1024
+# .txt files above this size are treated as logs (training output and the like)
+# and are not scanned for mentions.
+MAX_LOG_TXT_BYTES = 512 * 1024
 KEY_DOC_PATTERNS = [
     ("readme", re.compile(r"^readme", re.I)),
     ("results", re.compile(r"^results?[_\-.]", re.I)),
@@ -52,7 +63,22 @@ MENTION_RE = re.compile(
     + r"))(?![\w<>{}*$])",
     re.I,
 )
-BOT_RE = re.compile(r"bot\b|\[bot\]|claude|copilot|github-actions|dependabot|noreply\.anthropic", re.I)
+# "bot" only as a whole word or a separated suffix (ci-bot, ci_bot, [bot]), so
+# surnames such as Talbot or Abbott do not count.
+BOT_RE = re.compile(
+    r"\[bot\]|(?<![A-Za-z0-9])bot(?![A-Za-z0-9])|\b(?:claude|copilot|codex|dependabot|renovate|"
+    r"github-actions|gitlab-ci|pre-commit-ci|noreply\.anthropic)\b", re.I)
+PLACEHOLDER_EMAIL_RE = re.compile(r"@(?:[\w.-]+\.)?example\.(?:com|org|net)$|^your[_.-]|^you@|^user@localhost$", re.I)
+LATEX_COMMENT_RE = re.compile(r"(?<!\\)%.*$")
+LATEX_INCLUDE_RE = re.compile(
+    r"\\(input|include|subfile|includegraphics|includepdf|lstinputlisting|bibliography|addbibresource)\*?"
+    r"\s*(?:\[[^\]]*\]\s*)?\{([^{}]+)\}")
+LATEX_GRAPHICSPATH_RE = re.compile(r"\\graphicspath\s*\{((?:\s*\{[^{}]*\})+)\s*\}")
+LATEX_IMPLIED_EXTS = {
+    "input": (".tex",), "include": (".tex",), "subfile": (".tex",),
+    "includegraphics": (".pdf", ".png", ".jpg", ".jpeg", ".eps", ".svg"),
+    "includepdf": (".pdf",), "bibliography": (".bib",),
+}
 
 
 def set_utf8_output():
@@ -64,7 +90,50 @@ def set_utf8_output():
 
 
 def warn(msg):
-    print("WARN: " + msg, file=sys.stderr)
+    print("WARN: " + safe_text(msg), file=sys.stderr)
+
+
+def safe_text(text):
+    """Make a string encodable as UTF-8. File names that are not valid UTF-8
+    arrive from os.walk as surrogate escapes; show those bytes as \\xNN."""
+    try:
+        text.encode("utf-8")
+        return text
+    except UnicodeEncodeError:
+        pass
+    try:
+        return text.encode("utf-8", "surrogateescape").decode("utf-8", "backslashreplace")
+    except UnicodeError:
+        return text.encode("utf-8", "backslashreplace").decode("utf-8")
+
+
+def safe_data(obj):
+    """safe_text applied to every string (and dict key) of a JSON-like value."""
+    if isinstance(obj, str):
+        return safe_text(obj)
+    if isinstance(obj, dict):
+        return {safe_data(k): safe_data(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set)):
+        return [safe_data(v) for v in obj]
+    return obj
+
+
+def write_atomic(path, text):
+    """Write text to path through a temporary file in the same folder, so a
+    failure never leaves a truncated report behind."""
+    folder = os.path.dirname(path) or "."
+    os.makedirs(folder, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=".inventory-", suffix=".tmp", dir=folder)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", errors="backslashreplace", newline="\n") as fh:
+            fh.write(text)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def fmt_date(ts):
@@ -88,29 +157,52 @@ def mask_url_credentials(text):
 
 # ---------------------------------------------------------------- walking
 
-def walk_project(root):
-    """Return (files, skipped_dirs). files: list of dicts with rel, size, mtime."""
-    files, skipped = [], set()
+def looks_like_virtualenv(path):
+    return any(os.path.exists(os.path.join(path, m)) for m in VENV_MARKERS)
+
+
+def prune_reason(dirpath, d):
+    if d in PRUNE_DIRS:
+        return "tool or cache folder"
+    full = os.path.join(dirpath, d)
+    if (d.lower() in VENV_NAMES or os.path.exists(os.path.join(full, "pyvenv.cfg"))) and looks_like_virtualenv(full):
+        return "Python environment"
+    if d.startswith("."):
+        return "hidden folder"
+    return None
+
+
+def walk_project(root, exclude=()):
+    """Return (files, skipped_dirs, pruned). files: list of dicts with rel, size,
+    mtime. skipped_dirs: set of pruned folder names; pruned: list of
+    {path, reason} for every pruned folder. Paths in `exclude` are left out."""
+    files, skipped, pruned = [], set(), []
+    exclude = set(exclude)
     for dirpath, dirnames, filenames in os.walk(root):
         keep = []
         for d in dirnames:
-            if d in PRUNE_DIRS or d.startswith("."):
+            reason = prune_reason(dirpath, d)
+            if reason:
                 skipped.add(d)
+                rel_d = os.path.relpath(os.path.join(dirpath, d), root).replace("\\", "/")
+                pruned.append({"path": rel_d, "reason": reason})
             else:
                 keep.append(d)
         dirnames[:] = sorted(keep)
         for fn in sorted(filenames):
             full = os.path.join(dirpath, fn)
+            rel = os.path.relpath(full, root).replace("\\", "/")
+            if rel in exclude:
+                continue
             try:
                 st = os.stat(full)
             except OSError:
                 continue
-            rel = os.path.relpath(full, root).replace("\\", "/")
             files.append({"rel": rel, "size": st.st_size, "mtime": st.st_mtime})
             if len(files) >= MAX_FILES:
                 warn("stopped after %d files; the inventory is partial" % MAX_FILES)
-                return files, skipped
-    return files, skipped
+                return files, skipped, pruned
+    return files, skipped, pruned
 
 
 def build_tree(files, depth, max_files_per_dir=12):
@@ -194,9 +286,11 @@ def merge_identities(commits):
         groups[find(i)].append(k)
     authors = []
     for members in groups.values():
-        names = sorted({m[0] for m in members}, key=lambda n: -sum(idents[m]["count"] for m in members if m[0] == n))
+        names = sorted(sorted({m[0] for m in members}),
+                       key=lambda n: (-sum(idents[m]["count"] for m in members if m[0] == n), -len(n)))
         emails = sorted({m[1] for m in members})
-        placeholder = any(re.search(r"example\.(com|org)$|^your[_-]", m[1] + " " + m[0], re.I) for m in members)
+        placeholder = any(PLACEHOLDER_EMAIL_RE.search(m[1].strip()) or re.search(r"^your[_ -]", m[0].strip(), re.I)
+                          for m in members)
         authors.append({
             "name": names[0],
             "aliases": names[1:],
@@ -211,7 +305,9 @@ def merge_identities(commits):
     return authors
 
 
-def git_summary(root):
+def git_summary(root, exclude=()):
+    """Git facts for `root`. When root is a subfolder of the repository, the
+    log, commit counts and status are limited to that subfolder."""
     info = {"is_repo": False}
     ok, out = run_git(root, ["rev-parse", "--show-toplevel"])
     if not ok:
@@ -220,7 +316,11 @@ def git_summary(root):
         return info
     info["is_repo"] = True
     info["toplevel"] = out.strip().replace("\\", "/")
-    ok, out = run_git(root, ["log", "--reverse", "--format=%x1e%h%x1f%aN%x1f%aE%x1f%aI%x1f%s%x1f%b"])
+    ok, prefix = run_git(root, ["rev-parse", "--show-prefix"])
+    prefix = prefix.strip().replace("\\", "/") if ok else ""
+    info["subfolder"] = prefix.rstrip("/") or None
+    limit = ["--", "."] if prefix else []
+    ok, out = run_git(root, ["log", "--reverse", "--format=%x1e%h%x1f%aN%x1f%aE%x1f%aI%x1f%s%x1f%b"] + limit)
     commits = []
     if ok:
         for rec in out.split("\x1e"):
@@ -250,19 +350,37 @@ def git_summary(root):
     ok, out = run_git(root, ["remote", "-v"])
     info["remotes"] = sorted({re.sub(r"\s+\((fetch|push)\)$", "", mask_url_credentials(l.strip())).replace(chr(9), " ")
                               for l in out.splitlines() if l.strip()}) if ok else []
-    ok, out = run_git(root, ["rev-list", "--all", "--count"])
+    ok, out = run_git(root, ["rev-list", "--all", "--count"] + limit)
     info["commit_count_all_branches"] = int(out.strip()) if ok and out.strip().isdigit() else None
-    ok, out = run_git(root, ["status", "--porcelain=v1"])
+    ok, out = run_git(root, ["status", "--porcelain=v1"] + limit)
     untracked, modified = [], []
+    own = {prefix + rel for rel in exclude}  # report files, repository-relative
     if ok:
         for line in out.splitlines():
             if line.startswith("??"):
-                untracked.append(line[3:].strip().strip('"'))
+                path = line[3:].strip().strip('"')
+                if path in own or any(own_only_dir(root, prefix, path, o) for o in own):
+                    continue
+                untracked.append(path)
             elif line.strip():
+                if line[3:].strip().strip('"') in own:
+                    continue
                 modified.append(line.strip())
     info["untracked"] = untracked
     info["modified"] = modified
     return info
+
+
+def own_only_dir(root, prefix, path, own):
+    """True when `path` is an untracked folder whose only content is the report."""
+    if not path.endswith("/") or not own.startswith(path) or not path.startswith(prefix):
+        return False
+    folder = os.path.join(root, path[len(prefix):])
+    try:
+        entries = os.listdir(folder)
+    except OSError:
+        return False
+    return entries == [own[len(path):]] if "/" not in own[len(path):] else False
 
 
 # ---------------------------------------------------------------- analysis
@@ -361,18 +479,45 @@ def provenance_info(files):
 
 
 def load_texts(root, files, exclude):
-    texts = {}
+    """Return (texts, not_scanned). Text files over MAX_TEXT_BYTES, and .txt
+    files over MAX_LOG_TXT_BYTES (usually training logs), are not read; they
+    are listed in not_scanned as {path, size}."""
+    texts, not_scanned = {}, []
     for f in files:
         ext = os.path.splitext(f["rel"])[1].lower()
         if ext in TEXT_EXTS and f["rel"] not in exclude and os.path.basename(f["rel"]) != "PROJECT_INVENTORY.md":
+            if f["size"] > MAX_TEXT_BYTES or (ext == ".txt" and f["size"] > MAX_LOG_TXT_BYTES):
+                not_scanned.append({"path": f["rel"], "size": f["size"]})
+                continue
             t = read_text(root, f["rel"])
             if t is not None:
                 texts[f["rel"]] = t
-    return texts
+    return texts, not_scanned
+
+
+WORD_TOKEN_RE = re.compile(r"[\w-]+")
+WORD4_TOKEN_RE = re.compile(r"[\w-]{4,}")
+PATH_TOKEN_RE = re.compile(r"(?<![\w./-])[\w.-]*/[\w./-]*")
+
+
+def mention_index(texts):
+    """One pass over all texts. Returns (words, path_windows): every maximal
+    run of 4+ word characters and dashes, and every 2- or 3-segment window of
+    every slash-separated path-like token."""
+    words, windows = set(), set()
+    for t in texts.values():
+        words.update(WORD4_TOKEN_RE.findall(t))
+        for tok in PATH_TOKEN_RE.findall(t):
+            segs = [x for x in tok.strip("./").split("/") if x not in ("", ".")]
+            for n in (2, 3):
+                for i in range(len(segs) - n + 1):
+                    windows.add("/".join(segs[i:i + n]).rstrip("."))
+    return words, windows
 
 
 def orphan_results(results, texts):
-    blob = "\n".join(texts.values())
+    words, windows = mention_index(texts)
+    blob = None
     orphans = []
     for r in results:
         cands = list(r["subdirs"])
@@ -380,9 +525,15 @@ def orphan_results(results, texts):
             cands = [{"path": r["root"], "name": r["root"].split("/")[-1], "files": r["direct_files"]}]
         for d in cands:
             path, name = d["path"], d["name"]
-            mentioned = path in blob
-            if not mentioned and len(name) >= 4:
-                mentioned = re.search(r"(?<![\w-])" + re.escape(name) + r"(?![\w-])", blob) is not None
+            if WORD_TOKEN_RE.fullmatch(name):
+                mentioned = (len(name) >= 4 and name in words) or (
+                    re.fullmatch(r"[\w.\-/]+", path) is not None and path in windows)
+            else:
+                # unusual characters (spaces, dots, ...): fall back to a direct search
+                if blob is None:
+                    blob = "\n".join(texts.values())
+                mentioned = path in blob or (len(name) >= 4 and re.search(
+                    r"(?<![\w-])" + re.escape(name) + r"(?![\w-])", blob) is not None)
             if not mentioned:
                 orphans.append({"path": path, "files": d["files"]})
     return orphans
@@ -391,36 +542,45 @@ def orphan_results(results, texts):
 def missing_documents(texts, files, commits):
     all_paths = {f["rel"].lower() for f in files}
     basenames = {p.split("/")[-1] for p in all_paths}
-    refs = defaultdict(list)
+    refs = {}  # token -> {"count", "first", "sources"}
+    accepted = {}
 
-    def scan(source, text):
+    def accept(tok):
+        if len(tok) < 4 or ".." in tok:
+            return False
+        stem = os.path.splitext(tok.split("/")[-1])[0].lower()
+        return not (stem in PLACEHOLDER_STEMS or re.search(r"yyyy|xxx", tok, re.I))
+
+    def scan(source, text, is_file):
         text = URL_RE.sub(" ", text)
-        for ln, line in enumerate(text.splitlines(), 1):
-            for m in MENTION_RE.finditer(line):
-                tok = m.group(1).strip(".")
-                if len(tok) < 4 or ".." in tok:
-                    continue
-                stem = os.path.splitext(tok.split("/")[-1])[0].lower()
-                if stem in PLACEHOLDER_STEMS or re.search(r"yyyy|xxx", tok, re.I):
-                    continue
-                refs[tok].append("%s:%d" % (source, ln))
+        for m in MENTION_RE.finditer(text):
+            tok = m.group(1).strip(".")
+            ok = accepted.get(tok)
+            if ok is None:
+                ok = accepted[tok] = accept(tok)
+            if not ok:
+                continue
+            r = refs.get(tok)
+            if r is None:
+                ln = text.count("\n", 0, m.start()) + 1
+                r = refs[tok] = {"count": 0, "first": "%s:%d" % (source, ln), "sources": []}
+            r["count"] += 1
+            if is_file and (not r["sources"] or r["sources"][-1] != source):
+                r["sources"].append(source)
 
     for rel, t in texts.items():
-        scan(rel, t)
+        scan(rel, t, True)
     for c in commits:
-        scan("commit " + c["hash"], c["subject"] + "\n" + c["body"])
+        scan("commit " + c["hash"], c["subject"] + "\n" + c["body"], False)
 
     missing = []
-    for tok, where in refs.items():
+    for tok, r in refs.items():
         low = tok.lower().lstrip("./")
         base = low.split("/")[-1]
         if low in all_paths or base in basenames:
             continue
         ok = False
-        for src in where:
-            sp = src.split(":")[0]
-            if sp.startswith("commit "):
-                continue
+        for sp in r["sources"]:
             d = os.path.dirname(sp).lower()
             while True:
                 cand = (d + "/" + low) if d else low
@@ -436,8 +596,71 @@ def missing_documents(texts, files, commits):
             continue
         ext = os.path.splitext(tok)[1].lstrip(".").lower()
         missing.append({"name": tok, "kind": "document" if ext in DOC_EXTS else "data or code",
-                        "mentions": len(where), "first_seen": where[0]})
+                        "mentions": r["count"], "first_seen": r["first"]})
+    missing.extend(latex_missing(texts, all_paths))
     missing.sort(key=lambda m: (m["kind"] != "document", -m["mentions"], m["name"]))
+    return missing
+
+
+def latex_missing(texts, all_paths):
+    """Files named by \\input, \\include, \\includegraphics, \\bibliography and
+    similar that do not exist. A name is resolved, with the implied extension
+    when it has none, against the including file's folder and each folder
+    above it up to the project root (and any \\graphicspath entries)."""
+    graphics_dirs = []
+    for rel, t in texts.items():
+        if rel.lower().endswith(".tex"):
+            for m in LATEX_GRAPHICSPATH_RE.finditer(t):
+                graphics_dirs.extend(x.strip() for x in re.findall(r"\{([^{}]*)\}", m.group(1)) if x.strip())
+    refs = defaultdict(list)  # (command, name) -> [(source, line)]
+    for rel, t in texts.items():
+        if not rel.lower().endswith(".tex"):
+            continue
+        for ln, line in enumerate(t.splitlines(), 1):
+            line = LATEX_COMMENT_RE.sub("", line)
+            for m in LATEX_INCLUDE_RE.finditer(line):
+                cmd = m.group(1)
+                names = m.group(2).split(",") if cmd in ("bibliography", "addbibresource") else [m.group(2)]
+                for name in names:
+                    name = name.strip()
+                    if name and "\\" not in name and "#" not in name and not name.startswith("/"):
+                        refs[(cmd, name)].append((rel, ln))
+    missing = []
+    for (cmd, name), where in refs.items():
+        base = name.replace("\\", "/")
+        variants = [base]
+        implied = LATEX_IMPLIED_EXTS.get(cmd, ())
+        if os.path.splitext(base)[1].lower() not in implied:  # plot_0.85 has no real extension
+            variants += [base + e for e in implied]
+        found = False
+        for src, _ in where:
+            d = os.path.dirname(src)
+            dirs = []
+            while True:
+                dirs.append(d)
+                if cmd == "includegraphics":
+                    dirs.extend((d + "/" + g if d else g) for g in graphics_dirs)
+                if not d:
+                    break
+                d = os.path.dirname(d)
+            for d in dirs:
+                for v in variants:
+                    cand = os.path.normpath(os.path.join(d, v) if d else v).replace("\\", "/").lower()
+                    if cand in all_paths:
+                        found = True
+                        break
+                if found:
+                    break
+            if found:
+                break
+        if found:
+            continue
+        ext = os.path.splitext(base)[1].lower()
+        if implied and ext not in implied:
+            ext = implied[0]
+        ext = ext.lstrip(".")
+        missing.append({"name": name, "kind": "document" if ext in DOC_EXTS else "data or code",
+                        "mentions": len(where), "first_seen": "%s:%d" % where[0], "via": "\\" + cmd})
     return missing
 
 
@@ -461,6 +684,7 @@ def render(data, args):
     a("")
     g = data["git"]
     a("- Files scanned: %d (skipped dirs: %s)" % (data["file_count"], ", ".join(sorted(data["skipped_dirs"])) or "none"))
+    a("- This report (%s) is excluded from every count and list." % (data.get("report_path") or DEFAULT_OUT))
     if g.get("is_repo"):
         a("- Git: %d commits, %s to %s, %d human author(s) after merging identities, %d untracked paths, %d modified"
           % (g["commit_count"], g["first_date"], g["last_date"],
@@ -475,7 +699,11 @@ def render(data, args):
     a("## Git")
     a("")
     if g.get("is_repo"):
-        if g["toplevel"].rstrip("/").lower() != data["project_dir"].rstrip("/").lower():
+        if g.get("subfolder"):
+            a("Note: the repository root is %s, a parent of the inspected folder. Commits, counts and "
+              "status below are limited to %s/; branches and remotes are repository-wide." % (g["toplevel"], g["subfolder"]))
+            a("")
+        elif g["toplevel"].rstrip("/").lower() != data["project_dir"].rstrip("/").lower():
             a("Note: the repository root is %s, a parent of the inspected folder." % g["toplevel"])
             a("")
         a("- Commits on the current branch: %d (all branches: %s)" % (g["commit_count"], g.get("commit_count_all_branches")))
@@ -584,8 +812,16 @@ def render(data, args):
     a("")
     a("## Documents mentioned but absent on disk")
     a("")
-    a("A name is listed when no file with that path or base name exists anywhere in the scanned tree. It may be a generated, ignored, renamed or planned file.")
+    a("A name is listed when no file with that path or base name exists anywhere in the scanned tree. It may be a generated, ignored, renamed or planned file. "
+      "Files named by LaTeX commands (marked with the command) are resolved, with the implied extension, against the including file's folder and the folders above it.")
     a("")
+    if data.get("texts_not_scanned"):
+        ns = data["texts_not_scanned"]
+        a("Not scanned for mentions (text files over %s, or .txt files over %s, usually logs): %d file(s): %s%s"
+          % (human_size(MAX_TEXT_BYTES), human_size(MAX_LOG_TXT_BYTES), len(ns),
+             ", ".join("%s (%s)" % (x["path"], human_size(x["size"])) for x in ns[:10]),
+             ", ..." if len(ns) > 10 else ""))
+        a("")
     docs = [m for m in data["missing"] if m["kind"] == "document"]
     other = [m for m in data["missing"] if m["kind"] != "document"]
     for title, items, cap in (("Documents", docs, 60), ("Data or code files", other, 40)):
@@ -594,10 +830,24 @@ def render(data, args):
         if not items:
             a("- none")
         for m in items[:cap]:
-            a("- %s (%d mention%s, first at %s)" % (m["name"], m["mentions"], "" if m["mentions"] == 1 else "s", m["first_seen"]))
+            a("- %s%s (%d mention%s, first at %s)" % (m["name"], " (%s)" % m["via"] if m.get("via") else "",
+                                                     m["mentions"], "" if m["mentions"] == 1 else "s", m["first_seen"]))
         if len(items) > cap:
             a("- ... +%d more (see --json)" % (len(items) - cap))
         a("")
+    a("## Pruned directories")
+    a("")
+    pruned = data.get("pruned_dirs", [])
+    if pruned:
+        a("These folders were not walked; their files are not counted anywhere in this report.")
+        a("")
+        for d in pruned[:40]:
+            a("- %s/ (%s)" % (d["path"], d["reason"]))
+        if len(pruned) > 40:
+            a("- ... +%d more (see --json)" % (len(pruned) - 40))
+    else:
+        a("None.")
+    a("")
     a("## File tree (depth %d)" % args.depth)
     a("")
     a("```")
@@ -610,11 +860,15 @@ def render(data, args):
 def main(argv=None):
     ap = argparse.ArgumentParser(
         description="Inventory a research project: file tree, git history summary, results folders, "
-                    "key documents, orphan results and documents mentioned but absent.")
-    ap.add_argument("project_dir", help="project root to inspect (read only)")
-    ap.add_argument("--out", default="paper/PROJECT_INVENTORY.md",
-                    help="report path; relative paths are resolved against the project dir; "
-                         "use '-' to print the report to stdout instead (default: %(default)s)")
+                    "key documents, orphan results and documents mentioned but absent. The project is only read; "
+                    "the report is written to --out (default paper/PROJECT_INVENTORY.md inside the project). "
+                    "Use --out - or --no-write to print it instead.")
+    ap.add_argument("project_dir", help="project root to inspect; nothing in it is changed except the report file (see --out)")
+    ap.add_argument("--out", default=DEFAULT_OUT,
+                    help="report path, written (created or replaced) on every run; relative paths are resolved "
+                         "against the project dir; use '-' to print the report to stdout and write nothing "
+                         "(default: %(default)s)")
+    ap.add_argument("--no-write", action="store_true", help="write no file; same as --out -")
     ap.add_argument("--all-commits", action="store_true", help="list every commit instead of a per-day table")
     ap.add_argument("--depth", type=int, default=3, help="file tree depth (default 3)")
     ap.add_argument("--json", action="store_true", help="print the collected data as JSON on stdout")
@@ -628,17 +882,25 @@ def main(argv=None):
     root = root.replace("\\", "/")
 
     out_path = None
-    if args.out != "-":
+    if args.out != "-" and not args.no_write:
         out_path = args.out if os.path.isabs(args.out) else os.path.join(root, args.out)
         out_path = out_path.replace("\\", "/")
 
-    files, skipped = walk_project(root)
-    exclude = set()
-    if out_path and out_path.startswith(root + "/"):
-        exclude.add(out_path[len(root) + 1:])
-    git = git_summary(root)
+    # The report itself (and a report left at the default place by an earlier
+    # run) is never counted or listed.
+    own_rel = None
+    if out_path:
+        out_path = os.path.normpath(out_path).replace("\\", "/")
+        if out_path.startswith(root.rstrip("/") + "/"):
+            own_rel = out_path[len(root.rstrip("/")) + 1:]
+    exclude = {DEFAULT_OUT} | ({own_rel} if own_rel else set())
+    files, skipped, pruned = walk_project(root, exclude)
+    git = git_summary(root, exclude)
     results = results_inventory(files)
-    texts = load_texts(root, files, exclude)
+    texts, not_scanned = load_texts(root, files, exclude)
+    if not_scanned:
+        warn("%d large text file(s) not scanned for mentions (over %s, or .txt over %s), e.g. %s"
+             % (len(not_scanned), human_size(MAX_TEXT_BYTES), human_size(MAX_LOG_TXT_BYTES), not_scanned[0]["path"]))
     commits = git.get("commits", [])
     data = {
         "project_name": os.path.basename(root.rstrip("/")),
@@ -646,6 +908,9 @@ def main(argv=None):
         "generated": dt.date.today().isoformat(),
         "file_count": len(files),
         "skipped_dirs": sorted(skipped),
+        "pruned_dirs": pruned,
+        "report_path": own_rel,
+        "texts_not_scanned": not_scanned,
         "git": git,
         "key_documents": key_documents(root, files),
         "results": results,
@@ -654,28 +919,28 @@ def main(argv=None):
         "missing": missing_documents(texts, files, commits),
         "tree": build_tree(files, args.depth),
     }
-    report = render(data, args)
+    report = safe_text(render(data, args))
 
     wrote = False
     if out_path:
         try:
-            os.makedirs(os.path.dirname(out_path), exist_ok=True)
-            with open(out_path, "w", encoding="utf-8", newline="\n") as fh:
-                fh.write(report)
+            write_atomic(out_path, report)
             wrote = True
-        except OSError as exc:
-            warn("could not write %s (%s); printing the report instead" % (out_path, exc))
+        except (OSError, UnicodeError, ValueError) as exc:
+            warn("could not write %s (%s); %s" % (out_path, exc, "the JSON is still printed" if args.json
+                                                     else "printing the report instead"))
 
     if args.json:
-        print(json.dumps(data, indent=2, default=list))
+        print(json.dumps(safe_data(data), indent=2, default=list))
     elif not wrote:
         print(report)
     else:
         g = data["git"]
-        print("Inventory written to %s" % out_path)
+        print("Inventory written to %s" % safe_text(out_path))
         print("files scanned: %d" % data["file_count"])
         if g.get("is_repo"):
-            names = ", ".join("%s (%d)%s" % (au["name"], au["commits"], " [placeholder]" if au["placeholder_identity"] else "")
+            names = ", ".join("%s (%d)%s%s" % (au["name"], au["commits"], " [placeholder]" if au["placeholder_identity"] else "",
+                                               " [bot]" if au["looks_like_bot"] else "")
                               for au in g["authors"])
             print("git: %d commits, %s to %s" % (g["commit_count"], g["first_date"], g["last_date"]))
             print("authors: %s" % names)

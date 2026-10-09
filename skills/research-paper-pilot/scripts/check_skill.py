@@ -16,10 +16,16 @@ Checks (each prints PASS, FAIL or WARN):
   9. markdown files stay under 400 lines and start with "## Contents" above 100 lines
  10. no em dashes anywhere in the skill
  11. no machine-specific absolute paths in the skill
+ 12. every scripts/<name>.py named in SKILL.md, references/, templates/ or agents/ exists (WARN only)
+ 13. the version in SKILL.md metadata.version matches ../../.claude-plugin/plugin.json and
+     marketplace.json when those manifests exist (WARN only; skipped when the skill is installed alone)
+
+Links and paths are read outside fenced code blocks; markdown links also outside inline code.
 
 Exit code is 1 when any check FAILs, otherwise 0. Stdlib only.
 """
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -28,6 +34,8 @@ import sys
 SUBDIRS = ("references", "templates", "agents", "scripts")
 EM_DASH = chr(0x2014)
 PATH_RE = re.compile(r"(?<![\w/.-])((?:references|templates|agents|scripts)/[A-Za-z0-9_./\-]*[A-Za-z0-9_])(?![A-Za-z0-9_]*[<*{$\[])")
+SCRIPT_MENTION_RE = re.compile(r"(?<![\w/.-])scripts/([A-Za-z0-9_\-]+\.py)(?![\w-])")
+FENCE_RE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
 MACHINE_PATH_RE = re.compile(r"[A-Za-z]:[/\\]+(?:Users|Documents and Settings)\b|(?<![\w.])/(?:home|Users)/[A-Za-z0-9_.-]+/")
 
 
@@ -103,8 +111,86 @@ def list_files(skill_dir, sub):
 
 
 def read(path):
-    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+    # utf-8-sig: a byte-order mark some editors add must not hide the opening ---
+    with open(path, "r", encoding="utf-8-sig", errors="replace") as fh:
         return fh.read()
+
+
+def strip_code(text, inline=True):
+    """Blank fenced code blocks (and, with inline=True, `inline code` spans); line count is kept."""
+    out, fence = [], None
+    for line in text.split("\n"):
+        m = FENCE_RE.match(line)
+        if fence:
+            if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence):
+                fence = None
+            out.append("")
+            continue
+        if m:
+            fence = m.group(1)
+            out.append("")
+            continue
+        if inline:
+            line = re.sub(r"(`+).+?\1", lambda c: " " * len(c.group(0)), line)
+        out.append(line)
+    return "\n".join(out)
+
+
+def mentioned(path, text):
+    """True if the relative path or its basename appears as a whole token (gate.py is not prose_gate.py)."""
+    for t in (path, os.path.basename(path)):
+        if re.search(r"(?<![\w-])" + re.escape(t) + r"(?![\w-])", text):
+            return True
+    return False
+
+
+def nested_value(text, parent, key):
+    """Value of `parent: / key: value` in YAML frontmatter text (one nesting level), or None."""
+    m = re.search(r"^" + re.escape(parent) + r":[ \t]*\n((?:[ \t]+.*(?:\n|$)|[ \t]*\n)*)", text, re.M)
+    if not m:
+        return None
+    v = re.search(r"^[ \t]+" + re.escape(key) + r":[ \t]*[\"']?([^\"'\s#]+)", m.group(1), re.M)
+    return v.group(1) if v else None
+
+
+def version_check(skill_dir, text, name):
+    """(status, detail) comparing SKILL.md metadata.version with the plugin manifests, or None when the
+    manifests are absent (the skill can be installed on its own)."""
+    plug_dir = os.path.normpath(os.path.join(skill_dir, "..", "..", ".claude-plugin"))
+    found = []
+    m = re.match(r"^---[ \t]*\n(.*?)\n---", text, re.S)
+    skill_v = nested_value(m.group(1), "metadata", "version") if m else None
+    problems = []
+    for fn in ("plugin.json", "marketplace.json"):
+        path = os.path.join(plug_dir, fn)
+        if not os.path.isfile(path):
+            continue
+        try:
+            data = json.loads(read(path))
+        except ValueError as exc:
+            problems.append("%s does not parse (%s)" % (fn, exc))
+            continue
+        if not isinstance(data, dict):
+            continue
+        if fn == "plugin.json":
+            found.append(("plugin.json version", data.get("version")))
+        else:
+            meta = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
+            if "version" in meta:
+                found.append(("marketplace.json metadata.version", meta.get("version")))
+            plugins = [x for x in data.get("plugins") or [] if isinstance(x, dict)]
+            own = [x for x in plugins if x.get("name") == name] or plugins
+            for x in own:
+                if "version" in x:
+                    found.append(("marketplace.json plugins[%s].version" % x.get("name", "?"), x.get("version")))
+    if not found and not problems:
+        return None
+    found.insert(0, ("SKILL.md metadata.version", skill_v))
+    versions = {str(v) for _, v in found}
+    detail = ", ".join("%s=%s" % (k, v) for k, v in found)
+    if problems or len(versions) > 1 or skill_v is None:
+        return "WARN", "; ".join(problems + [detail])
+    return "PASS", detail
 
 
 def main(argv=None):
@@ -164,8 +250,7 @@ def main(argv=None):
     all_files = []
     for sub in SUBDIRS:
         all_files.extend(list_files(skill_dir, sub))
-    body_mentions = text
-    unmentioned = [f for f in all_files if f not in body_mentions and os.path.basename(f) not in body_mentions]
+    unmentioned = [f for f in all_files if not mentioned(f, text)]
     if not all_files:
         rep.line("FAIL", "every file in references/, templates/, agents/, scripts/ is mentioned in SKILL.md",
                  "no files found in those folders")
@@ -178,13 +263,13 @@ def main(argv=None):
     # resolution in SKILL.md
     def unresolved_in(content, base_dir):
         bad = []
-        for m in PATH_RE.finditer(content):
+        for m in PATH_RE.finditer(strip_code(content, inline=False)):
             rel = m.group(1)
             if "/" not in rel.rstrip("/"):
                 continue
             if not os.path.exists(os.path.join(base_dir, rel)):
                 bad.append(rel)
-        for m in re.finditer(r"\]\(([^)#\s]+)\)", content):
+        for m in re.finditer(r"\]\(([^)#\s]+)\)", strip_code(content)):
             target = m.group(1)
             if re.match(r"^[a-z]+:", target) or target.startswith("#"):
                 continue
@@ -256,6 +341,22 @@ def main(argv=None):
                 word_hits.append("%s:%s" % (f, w))
     rep.line("PASS" if not dash_hits else "FAIL", "no em dashes in the skill", ", ".join(dash_hits[:8]))
     rep.line("PASS" if not path_hits else "FAIL", "no machine-specific absolute paths in the skill", ", ".join(path_hits[:8]))
+
+    # scripts named in the docs exist (WARN: a research project can have its own scripts/ folder)
+    doc_files = ["SKILL.md"] + [f for f in all_files if f.endswith(".md") and f.split("/")[0] in
+                                ("references", "templates", "agents")]
+    missing_scripts = {}
+    for f in doc_files:
+        for m in SCRIPT_MENTION_RE.finditer(read(os.path.join(skill_dir, f))):
+            if not os.path.isfile(os.path.join(skill_dir, "scripts", m.group(1))):
+                missing_scripts.setdefault("scripts/" + m.group(1), []).append(f)
+    rep.line("WARN" if missing_scripts else "PASS", "every scripts/<name>.py named in the docs exists",
+             "; ".join("%s (in %s)" % (k, ", ".join(sorted(set(v))[:3])) for k, v in sorted(missing_scripts.items())[:8]))
+
+    # version agrees with the plugin manifests two levels up, when they exist
+    vc = version_check(skill_dir, text, name)
+    if vc:
+        rep.line(vc[0], "SKILL.md version matches the plugin manifests", vc[1])
     if args.forbid:
         rep.line("PASS" if not word_hits else "FAIL", "no forbidden words", ", ".join(word_hits[:8]))
 

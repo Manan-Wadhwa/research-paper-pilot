@@ -52,7 +52,7 @@ The order follows how much each layer carries and how fast each one decays.
 
 So the order is: structure (rhythm, connective openers, preview-then-restate, forced triads, closing loop), then staging (sentence-level moves such as not-X-but-Y), then vocabulary (clusters only), then punctuation. Do not reverse it, and do not skip to vocabulary because it is easy.
 
-A scanner run on a synthetic computer-science paper sample (abstract, methods, discussion, about 200 words in ordinary register) shows why the protections below exist. A general-purpose phrase scanner flagged a hard failure for "in conclusion", soft flags for "comprehensive" and "robust" in their plain technical senses, a "research suggests" that would carry a citation in a real paper, and the whole sample for uniform sentence length that was caused by the Methods paragraph. A structural scanner calibrated on blog prose scored two conventional connectives ("Furthermore", "Overall") at six times its human limit. A reading-grade flag fired on text no research paper could avoid. A scanner designed around regression against the source and preservation of facts passed the same sample, but its connective-opener ratio sat one paragraph from firing. Every finding that was wrong for a paper was a convention: formal connectives, scaffolding in conclusions, technical senses of ordinary words, Methods uniformity. Hence the protections list.
+Generic phrase and structure scanners, built for blogs and essays, flag paper conventions as tells: formal connectives, conclusion scaffolding, technical senses of ordinary words and uniform Methods sentences. Those false positives are why the protections list below overrides every pattern table.
 
 ## Step 0: decide whether to act, then classify each section
 
@@ -71,10 +71,10 @@ Then classify each section, because the layers apply differently:
 | Introduction | act | n/a | act | partial | keep one sentence | partial | Open on the gap, not on "in recent years". |
 | Related work | act | n/a | partial | partial | n/a | partial | Group by approach; both-sidesism is allowed here. |
 | Methods | advisory only | n/a | partial | keep | n/a | no | Passive and uniform sentences are conventions; protect. |
-| Results | partial | n/a | partial | partial | n/a | partial | "This section shows" is fine; strip interpretation that belongs in Discussion. |
+| Results | partial | n/a | partial | partial | n/a | partial | "This section shows" is fine; keep the sentence that ties numbers to the claim, move mechanism to Discussion. |
 | Discussion | act | partial | act | partial | n/a | interprets by design | Replace restatement with mechanism or limitation. |
 | Limitations | partial | n/a | partial | partial | n/a | no | Specific limitations stay specific. |
-| Conclusion | partial | allowed with a new element | act | partial | n/a | partial | Must add a limitation, number or next step. |
+| Conclusion | partial | allowed with a new element | act | partial | n/a | partial | Report a missing new element to the author; do not add one (W30). |
 
 "Advisory" means report it, do not rewrite it.
 
@@ -86,13 +86,13 @@ Before any edit, list the spans that must not change (see "The protections list"
 
 Work paragraph by paragraph, whole section in view. Four to six edits per section is typical; more means the draft needs rewriting by its author, not polishing.
 
-**Rhythm.** Measure before you edit: `python scripts/prose_gate.py <file> --academic` reports mean sentence length and its coefficient of variation. A paragraph is uniform when most sentences sit within five words of each other. Fix by merging two supporting sentences into one longer sentence, or by trimming one to its core. Rules that keep clarity intact:
+**Rhythm.** Measure before you edit: `python3 <skill>/scripts/prose_gate.py <file> --academic` reports mean sentence length and its coefficient of variation. A paragraph is uniform when most sentences sit within five words of each other. Fix by merging two supporting sentences into one longer sentence, or by trimming one to its core. Rules that keep clarity intact:
 
 - Never merge two sentences that each state a claim; never hide which condition belongs to which comparison.
 - Keep any short sentence that states a claim outright. Take the variation from the supporting material around it.
 - Do not create staccato. Several new very short sentences in a row is its own tell.
 
-Example (invented). Before, four sentences of 16, 15, 14 and 15 words: "The model was evaluated on three tasks. Each task used a held-out split of the data. Accuracy was measured at every checkpoint. The scores were averaged over five seeds." After: "We evaluated the model on three tasks, each with a held-out split. Accuracy was measured at every checkpoint and averaged over five seeds." The facts are identical; the lengths now differ.
+Example (invented, from a Results paragraph). Before, four sentences of 14, 15, 15 and 15 words: "Pretraining improved accuracy on all three tasks compared with the baseline trained from scratch. The pretrained model reached 81.2% accuracy on the held-out test sets, averaged over the tasks. The baseline reached 74.5% accuracy on the same held-out test sets under the same averaging. The gap between the two models was largest on the task with the longest inputs." After, three sentences of 7, 19 and 11 words: "Pretraining improved accuracy on all three tasks. Averaged over the held-out test sets, the pretrained model reached 81.2% and the baseline trained from scratch reached 74.5%. The gap was largest on the task with the longest inputs." The claim sentence is trimmed to its core, the two supporting sentences are merged, and the facts are identical.
 
 **Connective openers.** If more than a third of paragraphs open with Moreover, Furthermore or Additionally, open on the claim instead. Keep however, thus, in contrast, although and similar words that name a real relation, and never delete a connective without restoring the link in another form. Never swap one connective for another to look varied.
 
@@ -100,7 +100,7 @@ Example (invented). Before, four sentences of 16, 15, 14 and 15 words: "The mode
 
 **Forced triads.** Where three items are listed by reflex, develop the strongest one or two. Keep any triad that matches three real things (three metrics, three datasets).
 
-**Closing loop.** If the Conclusion repeats the Introduction with no new element, add one real element (a limitation, a number from the results file, a named next experiment) and cut the echo. Take the number from the numbers file, never from memory.
+**Closing loop.** If the Conclusion repeats the Introduction with no new element, cut the echo and report the gap to the author, routing it to `write`. Never add a fact in a humanize pass: a new limitation, number or next experiment is a content edit, and `verify_rewrite.py` fails it as ADDED.
 
 ## Step 3: staging
 
@@ -114,7 +114,9 @@ Act on a single sighting for these; they are the patterns readers notice conscio
 - Inflated significance [C1] and generic positive closers [C7]: keep the fact, drop the verdict.
 - -ing riders [C3]: keep the fact, drop the rider unless a result supports it.
 - Copula avoidance [V3]: use "is", "are", "has".
-- Over-explaining sentences [S6]: cut, or move the interpretation to Discussion.
+- Over-explaining sentences [S6]: cut the repeats, but keep the one sentence that ties the paragraph's numbers to its claim.
+- Lists standing in for an argument [S17]: rewrite as prose that states the links, keeping every item's facts.
+- Private vocabulary and number dumps [S18, S19]: do not fix here; list them in the report and route to `write` or `revise`, because renaming and moving numbers to a table are content edits.
 - Audit and defensive voice [C18]: state the design fact once, in the section where it is needed; move process detail to Methods or an appendix.
 
 Staging repairs are small. When a repair needs a new fact, stop and ask the author.
@@ -136,13 +138,15 @@ Em dashes are capped, not banned: none in the abstract, at most one per paragrap
 After every rewrite, with no exceptions, run:
 
 ```
-python scripts/verify_rewrite.py drafts/intro.v1.tex intro.tex
+python3 <skill>/scripts/verify_rewrite.py drafts/intro.v1.tex intro.tex
 ```
 
 Add `--strict` when the author wants structural regressions to fail as well. The script compares the rewrite with the source and reports:
 
 - **DROPPED**: a number, unit, year, proper noun, citation key, URL, quoted string or LaTeX reference present in the source and absent in the rewrite. This is a lost fact. The run fails.
 - **ADDED**: the same kinds of token present in the rewrite and absent in the source. This is an invented fact, the worse error. The run fails.
+- **DROPPED or ADDED negation, hedge or approximator**: a "not", "no", "may", "suggests", "about" or a bound such as "p < 0.05" that lost or gained its counterpart in the matching clause, including a negation that moved to a different claim. The run fails. `--lenient-hedges` and `--lenient-negations` downgrade these to warnings for a deliberate, author-approved change; never use them to get a pass.
+- **Direction and range warnings**: "rose" became "fell" next to the same numbers, or "from X to Y" was reversed. These warn (fail under `--strict`); check each one against the result file.
 - **Structural regression**: sentence-length variation and paragraph-length variance before and after. If either fell, the rewrite removed surface tells and flattened the prose beneath them. This warns (fails under `--strict`).
 
 How to respond:
@@ -192,7 +196,7 @@ Do not alter any of the following, whatever a pattern table says.
 - Math, LaTeX commands, labels, references, environments, tables and code.
 - Technical senses of ordinary words: robust, significant (with a test), landscape, comprehensive when it describes real coverage.
 - Required headings (Limitations, Related Work, Broader Impact, and so on). Judge their content, not their existence.
-- The claim-strength label of every sentence: do not upgrade "suggests" to "shows", and do not downgrade "shows" without logging a decision in `LAB_LOG.md`.
+- The claim-strength label of every sentence: do not upgrade "suggests" to "shows" or downgrade "shows" to "suggests". A claim whose wording outruns its status is reported and routed to `evidence` or `hypothesis`, never reworded here.
 - Anonymization choices in a blind submission.
 
 ## The disclosure line

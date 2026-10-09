@@ -18,7 +18,7 @@ Seed papers: {SEEDS}
 
 ## Notes
 
-Write one file per kept paper at `{OUT_DIR}/notes/<citekey>.md`, with these fields.
+Write one file per kept paper at `{OUT_DIR}/notes/<citekey>.md`, with these fields. The caller's merge step copies kept notes into `paper/litreview/notes/` and combines the query logs; do not write there yourself.
 
 ```
 # <citekey>: <title>

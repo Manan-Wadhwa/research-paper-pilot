@@ -2,16 +2,32 @@
 """verify_rewrite.py: prove that a prose rewrite kept the facts of its source.
 
 What it compares (each is a "fact"; losing or inventing one is a FAIL)
-  numbers (with attached units such as %, GB, ms, layers), years, proper nouns and identifiers,
-  citation keys (LaTeX \\cite*, Markdown [@key], numeric [12], author-year), URLs / DOIs / arXiv ids,
-  quoted strings, LaTeX \\ref / \\label keys, non-trivial math spans, and custom LaTeX macros
-  (for example a number macro like \\NumAcc{}).
+  numbers (with attached units such as %, GB, ms, layers; exponents kept, so 3e-4, 3E-4,
+  3 x 10^-4 and $3\\times10^{-4}$ are one value and 3e-5 is another; spelled numbers such as
+  "two hundred" or "one seed" read as digits), years, proper nouns and identifiers, citation keys
+  (LaTeX \\cite*, Markdown [@key], numeric [12], author-year in either "(Smith et al., 2020)" or
+  "Smith et al. (2020)" form), URLs / DOIs / arXiv ids, quoted strings, LaTeX \\ref / \\label keys,
+  non-trivial math spans, and custom LaTeX macros (for example a number macro like \\NumAcc{}).
+
+Claim markers (also a FAIL by default)
+  Each sentence is cut into clauses and anchored to its facts (numbers, proper nouns) and content
+  words; each clause is matched to the rewrite clauses that share most of those anchors. A negation
+  (not, no, never, none, fails to, rather than ...; "without" only counts toward the overall negation
+  count, since "removing X" -> "without X" is a paraphrase) or a meaning-bearing hedge (may, might,
+  suggests, seems, likely, possibly, roughly ...) that is present in a source clause and absent from
+  every matching rewrite clause is reported as DROPPED with its sentence; one that appears in a
+  rewrite clause with no counterpart in the matching source clauses is ADDED. So "not significant" -> "significant",
+  "may reflect" -> "reflects", and a "not" moved from the layer-9 claim to the layer-6 claim all fail.
+  Qualifiers fixed to a number are compared per number: approximators (about, approximately, roughly,
+  around, nearly, ~) and bounds (more than, at least, up to, <, >=, ...): "about 12%" -> "12%" fails.
+  --lenient-hedges / --lenient-negations turn those failures into warnings (failures under --strict).
 
 What it only warns about (a FAIL under --strict)
-  hedge families that vanish or shrink (may, suggests, probably, roughly ...), added certainty words
-  (proves, clearly, always ...), a changed count of negations, repeated-number counts, and structural
-  flattening: sentence-length CV or paragraph-length variation dropping sharply, or the text
-  growing or shrinking by more than a third.
+  hedge families that vanish or shrink overall, added certainty words (proves, clearly, always ...),
+  a changed count of negations, repeated-number counts, a direction word that flips next to the same
+  numbers (rose/fell, increased/decreased, higher/lower, improved/degraded), the two numbers of
+  "from X to Y" swapped, and structural flattening: sentence-length CV (short sentences included)
+  or paragraph-length variation dropping sharply, or the text growing or shrinking by more than a third.
 
 LaTeX awareness: comments, preamble, floats and tables are skipped; \\cite{a,b} contributes the keys a
 and b as facts; $math$ is compared as a unit (simple numeric math such as $0.02\\%$ is read as text);
@@ -20,6 +36,7 @@ formatting commands are unwrapped so wording can change around them.
 Usage
   python verify_rewrite.py source.md rewrite.md
   python verify_rewrite.py old.tex new.tex --strict --json
+  python verify_rewrite.py old.md new.md --lenient-hedges
 
 Exit codes: 0 PASS (warnings allowed), 1 FAIL (dropped or added facts, or a strict failure),
             2 an input file cannot be read. Python 3.9+, standard library only.
@@ -32,6 +49,7 @@ import re
 import statistics
 import sys
 from collections import Counter
+from decimal import Decimal, InvalidOperation
 
 EM = "\u2014"
 EN = "\u2013"
@@ -123,16 +141,58 @@ appendix tableofcontents newpage clearpage quad qquad textwidth linewidth column
 textbackslash textasciitilde textless textgreater path S P sloppy begingroup endgroup relax protect
 """.split())
 NUMERIC_MATH_RE = re.compile(r"^[\d\s.,%~\u2248\u2265\u2264\u00b1\u00d7<>=+\-\u2212/()]*$")
+# 3 x 10^-4, 3\times10^{-4}, 3 \cdot 10^{-4} -> 3e-4 ; a bare 10^{-4} -> 1e-4
+SCI_RE = re.compile(r"(\d(?:[\d.,]*\d)?)\s*(?:[x\u00d7\u00b7*]|\\times|\\cdot)\s*10\s*\^\s*\{?\s*\(?\s*([-+\u2212]?)\s*(\d+)\s*\)?\s*\}?")
+POW10_RE = re.compile(r"(?<![\w.^])10\s*\^\s*\{?\s*\(?\s*([-+\u2212]?)\s*(\d+)\s*\)?\s*\}?")
+
+
+def sci_to_e(t):
+    t = SCI_RE.sub(lambda m: "%se%s%s" % (m.group(1), m.group(2), m.group(3)), t)
+    return POW10_RE.sub(lambda m: "1e%s%s" % (m.group(1), m.group(2)), t)
 
 
 def math_to_plain(m):
     t = m
+    # \sim becomes the approximately-equal sign: a bare "~" is a LaTeX tie and is dropped later
     for a, b in (("{,}", ","), ("\\%", "%"), ("\\,", ""), ("\\;", ""), ("\\!", ""), ("\\ ", ""),
-                 ("{\\sim}", "~"), ("\\sim", "~"), ("\\geq", "\u2265"), ("\\ge", "\u2265"),
+                 ("{\\sim}", "\u2248"), ("\\sim", "\u2248"), ("\\geq", "\u2265"), ("\\ge", "\u2265"),
                  ("\\leq", "\u2264"), ("\\le", "\u2264"), ("\\pm", "\u00b1"), ("\\times", "\u00d7"),
-                 ("\\approx", "\u2248"), ("{", ""), ("}", "")):
+                 ("\\cdot", "\u00b7"), ("\\approx", "\u2248"), ("{", ""), ("}", "")):
         t = t.replace(a, b)
-    return t
+    return sci_to_e(t)
+
+
+def numeric_math(plain):
+    """True if a math span is only a number (exponents allowed), so it is read as text."""
+    return bool(NUMERIC_MATH_RE.match(re.sub(r"(?<=\d)e[-+\u2212]?\d+", "", plain)))
+
+
+AY_NAME = r"[A-Z][A-Za-z\-']+(?:\s+et\s+al\b\.?|\s+(?:and|&)\s+[A-Z][A-Za-z\-']+)?"
+AY_PAREN_RE = re.compile(r"\((?:(?:e\.g\.|see|cf\.)[,\s]+)?(" + AY_NAME + r",?\s+\d{4}[a-z]?(?:\s*;[^)]*)?)\)")
+AY_NARR_RE = re.compile(r"\b(" + AY_NAME + r")\s+\((\d{4}[a-z]?)\)")
+
+
+def ay_key(s):
+    """One spelling for an author-year key: 'Smith et al., 2020' == 'Smith et al. 2020'."""
+    s = re.sub(r"\s*&\s*", " and ", s).replace(",", " ")
+    s = re.sub(r"\bet\s+al\b\.?", "et al.", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def author_year(s, facts):
+    """Record author-year citations, parenthetical (Smith et al., 2020; Lee, 2019) or narrative
+    Smith et al. (2020), as one key per work, so moving between the two forms is not a lost fact."""
+    def paren_cb(m):
+        for part in m.group(1).split(";"):
+            if part.strip():
+                facts.add("citation", ay_key(part), line_of(m))
+        return CITE_P
+    s = AY_PAREN_RE.sub(paren_cb, s)
+
+    def narr_cb(m):
+        facts.add("citation", ay_key(m.group(1) + " " + m.group(2)), line_of(m))
+        return AUTH
+    return AY_NARR_RE.sub(narr_cb, s)
 
 
 def latex_to_text(raw, facts):
@@ -186,6 +246,7 @@ def latex_to_text(raw, facts):
             return AUTH + nl(m.group(0))
         return CITE_P + nl(m.group(0))
     s = CITE_RE.sub(cite_cb, s)
+    s = author_year(s, facts)
 
     def ref_cb(m):
         kind = "label" if m.group(1) == "label" else "ref"
@@ -204,7 +265,7 @@ def latex_to_text(raw, facts):
     def math_cb(m):
         inner = next(g for g in m.groups() if g is not None)
         plain = math_to_plain(inner)
-        if NUMERIC_MATH_RE.match(plain):
+        if numeric_math(plain):
             return " " + plain + " " + nl(m.group(0))
         facts.add("math", re.sub(r"\s+", "", inner), line_of(m))
         return " MATH " + nl(m.group(0))
@@ -288,10 +349,7 @@ def markdown_to_text(raw, facts):
         return CITE_P
     s = re.sub(r"\[\d+(?:\s*[,\u2013-]\s*\d+)*\]", num_cb, s)
 
-    def ay_cb(m):
-        facts.add("citation", re.sub(r"\s+", " ", m.group(0)[1:-1]), line_of(m))
-        return CITE_P
-    s = re.sub(r"\((?:[A-Z][A-Za-z\-]+(?:\s+et al\.|\s+and\s+[A-Z][A-Za-z\-]+)?,?\s+\d{4}[a-z]?(?:;[^)]*)?)\)", ay_cb, s)
+    s = author_year(s, facts)
     # LaTeX-style commands that sometimes appear in Markdown (pandoc, Overleaf notes)
     s = CITE_RE.sub(lambda m: (
         [facts.add("citation", k.strip(), line_of(m)) for k in m.group(3).split(",") if k.strip()],
@@ -300,7 +358,7 @@ def markdown_to_text(raw, facts):
     def mm(m):
         inner = next(g for g in m.groups() if g is not None)
         plain = math_to_plain(inner)
-        if NUMERIC_MATH_RE.match(plain):
+        if numeric_math(plain):
             return " " + plain + " "
         facts.add("math", re.sub(r"\s+", "", inner), line_of(m))
         return " MATH "
@@ -316,13 +374,22 @@ def markdown_to_text(raw, facts):
 # number, unit, proper noun, quote extraction
 # --------------------------------------------------------------------------
 
-NUMWORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
-            "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16,
-            "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20, "thirty": 30, "forty": 40,
-            "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90, "hundred": 100,
-            "thousand": 1000, "million": 1000000}
-NUMWORD_RE = re.compile(r"\b(?:(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)[- ](one|two|three|four|five|six|seven|eight|nine)|(" +
-                        "|".join(NUMWORDS) + r"))\b", re.I)
+NUM_SMALL = {"zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
+             "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15,
+             "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19}
+NUM_TENS = {"twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80,
+            "ninety": 90}
+NUM_MULT = {"hundred": 100, "thousand": 1000, "million": 1000000, "billion": 1000000000}
+NUMWORDS = dict(NUM_SMALL, **NUM_TENS, **NUM_MULT)
+_NW = "(?:" + "|".join(sorted(NUMWORDS, key=len, reverse=True)) + ")"
+# a run of number words: "two hundred", "twenty-five", "three thousand five hundred and six"
+NUMWORD_RE = re.compile(r"\b" + _NW + r"(?:(?:[ \t]*-[ \t]*|[ \t]+(?:and[ \t]+)?)" + _NW + r")*\b", re.I)
+DIGIT_MULT_RE = re.compile(r"(?<![\w.])(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)[ \t]+(hundred|thousand|million|billion)\b", re.I)
+# "one" is the pronoun, not a count, in "one of", "no one", "the one that", "on one hand" ...
+ONE_PRONOUN_BEFORE = re.compile(r"\b(?:no|any|every|some|each|the|this|that|which|anyone|someone)\s+$", re.I)
+ONE_PRONOUN_AFTER = re.compile(r"\s*(?:$|[^\w\s-]|(?:of|another|or|and|the|a|an|that|which|who|whom|whose|can|could|may|"
+                               r"might|will|would|should|must|is|was|are|were|has|had|does|did|to|in|on|at|by|for|"
+                               r"with|from|as|than|hand|side|way|such|another|else)\b)", re.I)
 UNIT_SYMBOLS = {"%", "ms", "s", "B", "M", "K", "KB", "MB", "GB", "TB", "GiB", "MiB", "Hz", "kHz", "MHz", "GHz",
                 "kg", "g", "mg", "mm", "cm", "m", "km", "nm", "V", "W", "kW", "J", "x", "\u00d7", "\u00b0C",
                 "\u00b0F", "FLOPs", "px", "dB", "ppm", "bp"}
@@ -338,20 +405,116 @@ UNITS_ALT = "|".join(sorted({re.escape(u) for u in UNIT_SYMBOLS if u != "%"} |
                             {re.escape(u) + "s?" for u in UNIT_WORDS}, key=len, reverse=True))
 NUM_CORE = r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+"
 RANGE_RE = re.compile(r"(?<![\w.])(" + NUM_CORE + r")\s*(?:[\u2013-]|to)\s*(" + NUM_CORE + r")\s*(%|(?:" + UNITS_ALT + r")\b)", re.I)
-NUM_RE = re.compile(r"(?<![\w.])(" + NUM_CORE + r")(?:[eE][-+]?\d+)?")
+# group 1 the mantissa, group 2 the exponent (3e-4, 1.5E-3): the exponent is part of the value
+NUM_RE = re.compile(r"(?<![\w.])(" + NUM_CORE + r")(?:[eE]([-+\u2212]?\d+))?")
+EXP_TOK_RE = re.compile(r"E[-+\u2212]?\d+")
+FROM_TO_RE = re.compile(r"\bfrom\s+(?:about\s+|~\s*)?(" + NUM_CORE + r")(?:[eE]([-+\u2212]?\d+))?(?:\s*%|\s+[A-Za-z]+)?"
+                        r"\s+to\s+(?:about\s+|~\s*)?(" + NUM_CORE + r")(?:[eE]([-+\u2212]?\d+))?", re.I)
+# a qualifier fixed to the number that follows it: approximators and bounds
+QUAL_RE = re.compile(r"(?:\b(about|approximately|approx\.|roughly|around|nearly|almost|circa|ca\.)|(~|\u2248|\u223c)|"
+                     r"\b(more than|greater than|at least|no less than|not less than|no fewer than|less than|fewer than|"
+                     r"at most|up to|no more than|not more than)|(<=|>=|\u2264|\u2265|<|>))\s*$", re.I)
+QUAL_CANON = {"more than": ">", "greater than": ">", "at least": ">=", "no less than": ">=", "not less than": ">=",
+              "no fewer than": ">=", "less than": "<", "fewer than": "<", "at most": "<=", "up to": "<=",
+              "no more than": "<=", "not more than": "<=", "<=": "<=", ">=": ">=", "\u2264": "<=",
+              "\u2265": ">=", "<": "<", ">": ">"}
 CAP_RE = re.compile(r"[A-Z][A-Za-z0-9]*(?:[-.](?=[A-Za-z0-9])[A-Za-z0-9]+)*(?:['\u2019]s)?")
 STOP_CAPS = {"Figure", "Fig", "Table", "Section", "Sec", "Appendix", "Eq", "Equation", "Theorem", "Lemma",
              "Algorithm", "Chapter", "Proposition", "Definition", "Corollary", "Remark", "Example", "Step",
              "Part", "Panel", "I"}
+# ordinary words: capitalised at the start of a sentence they are not proper nouns; lower-case they
+# carry no claim on their own, so they are not used to anchor a negation or hedge either
+COMMON_WORDS = set("""
+a about above across after afterwards again against all almost along also although always among an and another
+any anything are around as at because been before being below between beyond both but by can could did do does
+doing done down due during each either else even ever every first for from further furthermore given had has
+have having he hence her here hers his how however if in indeed instead into is it its itself just last later
+least less like likewise many may meanwhile might more moreover most much must namely near nevertheless next
+nonetheless now of off often on once one only onto or other otherwise our ours out over overall per perhaps
+rather same second several she should similarly since so some such than that the their theirs them then there
+thereby therefore these they third this those though through throughout thus to together too toward towards
+under unless unlike until up upon us very via was we well were what whatever when whenever where whereas
+wherever whether which while who whom whose why will with within without would yet you your finally
+specifically notably importantly crucially accordingly consequently still besides let note we're it's let's
+using based compared following
+""".split())
 ABBR_BEFORE_PERIOD = {"e.g", "i.e", "vs", "cf", "al", "fig", "eq", "sec", "no", "approx", "resp", "etc", "dr",
                       "mr", "ms", "prof", "st"}
 
 
-def norm_number(txt):
+def norm_number(txt, exp=None):
+    """Canonical text of a number. Thousands separators go; trailing zeros stay (0.50 is not 0.5).
+    A number with an exponent, or one below 0.001, is written as mantissa e exponent with the
+    mantissa's digits kept: 3e-4 == 3E-4 == 3 x 10^-4 == 0.0003, and 3.0e-4 keeps its precision."""
     t = txt.replace(",", "")
     if t.startswith("."):
         t = "0" + t
-    return t
+    if exp is None and not re.match(r"0\.000\d", t):
+        return t
+    try:
+        d = Decimal(t + ("e" + exp.replace("\u2212", "-") if exp else ""))
+    except InvalidOperation:
+        return t
+    sign, digits, e = d.as_tuple()
+    digits = list(digits)
+    while len(digits) > 1 and digits[0] == 0:
+        digits.pop(0)
+    mant = str(digits[0]) + ("." + "".join(str(x) for x in digits[1:]) if len(digits) > 1 else "")
+    return "%s%se%d" % ("-" if sign else "", mant, e + len(digits) - 1)
+
+
+def numwords_to_digits(m):
+    """NUMWORD_RE callback: 'two hundred' -> '200', 'twenty-five' -> '25', 'two and three' -> '2 and 3'."""
+    words = re.findall(r"[A-Za-z]+", m.group(0))
+    if len(words) == 1 and words[0].lower() == "one":
+        if ONE_PRONOUN_BEFORE.search(m.string[max(0, m.start() - 12):m.start()]) or \
+                ONE_PRONOUN_AFTER.match(m.string[m.end():m.end() + 12]):
+            return m.group(0)
+    out = []
+    tot, cur, last, pend = 0, 0, None, False
+
+    def close():
+        if last is not None:
+            out.append(str(tot + cur))
+        if pend:
+            out.append("and")
+    for w in words:
+        lw = w.lower()
+        if lw == "and":
+            if last in ("hund", "big") and not pend:
+                pend = True   # "two hundred and five"; kept only if a number word follows
+            else:
+                close()
+                out.append("and")
+                tot, cur, last, pend = 0, 0, None, False
+            continue
+        if lw in NUM_SMALL or lw in NUM_TENS:
+            v = NUMWORDS[lw]
+            if not (last is None or last in ("hund", "big") or (last == "tens" and 1 <= v <= 9)):
+                close()
+                tot, cur, last = 0, 0, None
+            cur += v
+            last = "tens" if lw in NUM_TENS else "small"
+        elif lw == "hundred":
+            if last in ("small", "tens") and 0 < cur < 100:
+                cur *= 100
+            elif last is None:
+                cur = 100
+            else:
+                close()
+                tot, cur = 0, 100
+            last = "hund"
+        else:
+            v = NUM_MULT[lw]
+            if last in ("small", "tens", "hund"):
+                tot, cur = tot + max(cur, 1) * v, 0
+            else:
+                close()
+                tot, cur = v, 0
+            last = "big"
+        pend = False
+    close()
+    return " ".join(out)
 
 
 def unit_after(text, end):
@@ -421,29 +584,34 @@ def extract_text_facts(text, facts, caps_out):
             continue
         if tok in UNIT_SYMBOLS and re.search(r"\d\s{0,3}$", t[max(0, m.start() - 5):m.start()]):
             continue
+        if is_exponent(m):
+            continue
         start = sentence_start(t, m.start())
         has_digit = any(c.isdigit() for c in tok)
         camel = has_digit or sum(1 for c in tok if c.isupper()) >= 2
-        nxt = t[m.end():m.end() + 40]
-        nextcap = bool(re.match(r"[ ][A-Z][a-z]", nxt))
+        nxt = re.match(r" ([A-Z][A-Za-z0-9]*)", t[m.end():m.end() + 40])
+        nextcap = bool(nxt and re.match(r"[A-Z][a-z]", nxt.group(1)) and nxt.group(1) not in STOP_CAPS
+                       and nxt.group(1) not in PLACEHOLDERS)
         caps_out.append({"tok": tok, "line": line_of(m), "start": start, "camel": camel, "nextcap": nextcap,
                          "digit": has_digit})
     # remove identifier tokens containing digits so their digits are not read as numbers
-    t2 = CAP_RE.sub(lambda m: " " if any(c.isdigit() for c in m.group(0)) else m.group(0), t)
+    t2 = CAP_RE.sub(lambda m: " " if any(c.isdigit() for c in m.group(0)) and not is_exponent(m) else m.group(0), t)
     t2 = re.sub(r"(?<!\w)\(\d{1,2}\)(?=\s)", " ", t2)
     t2 = re.sub(r"(?m)^\s*\d{1,2}[.)]\s", " ", t2)
     t2 = re.sub(r"\[@c\]|URL|MATH|REF", " ", t2)
-    # spelled numbers become digits
-    def nw(m):
-        if m.group(1):
-            return str(NUMWORDS[m.group(1).lower()] + NUMWORDS[m.group(2).lower()])
-        return str(NUMWORDS[m.group(3).lower()])
-    t2 = NUMWORD_RE.sub(nw, t2)
+    # spelled numbers become digits ("1.5 million" and "two million" too); 3 x 10^-4 becomes 3e-4
+    t2 = DIGIT_MULT_RE.sub(lambda m: format((Decimal(m.group(1).replace(",", "")) * NUM_MULT[m.group(2).lower()]).normalize(), "f"), t2)
+    t2 = NUMWORD_RE.sub(numwords_to_digits, t2)
+    t2 = sci_to_e(t2)
+    # "from X to Y": the order is part of the claim
+    for m in FROM_TO_RE.finditer(t2):
+        facts.add("order", "%s -> %s" % (norm_number(m.group(1), m.group(2)), norm_number(m.group(3), m.group(4))),
+                  line_of(m))
     # ranges with units: "78-107%" -> "78 % 107 %"
     t2 = RANGE_RE.sub(lambda m: "%s %s %s %s" % (m.group(1), m.group(3), m.group(2), m.group(3)), t2)
     for m in NUM_RE.finditer(t2):
         raw = m.group(1)
-        val = norm_number(raw)
+        val = norm_number(raw, m.group(2))
         pre = t2[max(0, m.start() - 2):m.start()]
         sign = ""
         if pre.endswith(("-", "\u2212")) and (len(pre) < 2 or pre[0] in " (\n"):
@@ -451,12 +619,22 @@ def extract_text_facts(text, facts, caps_out):
         unit = unit_after(t2, m.end())
         full = sign + val
         if unit:
-            facts.add("number", "%s %s" % (full, unit), line_of(m))
+            value, kind = "%s %s" % (full, unit), "number"
         elif re.fullmatch(r"(?:19|20)\d\d", val):
-            facts.add("year", val, line_of(m))
+            value, kind = val, "year"
         else:
-            facts.add("number", full, line_of(m))
+            value, kind = full, "number"
+        facts.add(kind, value, line_of(m))
+        q = QUAL_RE.search(t2[max(0, m.start() - 24):m.start() - len(sign)])
+        if q:
+            word = (q.group(1) or q.group(3) or q.group(4) or "").lower()
+            facts.add("qualifier", "%s %s" % (QUAL_CANON.get(word, "~"), value), line_of(m))
     return t
+
+
+def is_exponent(m):
+    """A CAP_RE match that is the exponent of a number written like 1.5E-3."""
+    return bool(EXP_TOK_RE.fullmatch(m.group(0)) and m.start() > 0 and m.string[m.start() - 1].isdigit())
 
 
 # --------------------------------------------------------------------------
@@ -474,7 +652,36 @@ HEDGE_FAMILIES = {
 STRENGTH_RE = re.compile(r"\b(?:proves?|proven|demonstrates?|demonstrated|clearly|definitively|always|never|entirely|"
                          r"consistently|undoubtedly|obviously|certainly|confirms?|confirmed|establishes?|established|"
                          r"causes?|conclusively|unambiguously)\b", re.I)
-NEG_RE = re.compile(r"\b(?:not|no|never|neither|nor|cannot|without|none|fails? to)\b|n't|n\u2019t", re.I)
+# "not only ... but also" and bounds such as "no more than 5%" are not negated claims (the bound is
+# compared as a qualifier of its number instead)
+NEG_RE = re.compile(r"\b(?:not(?!\s+(?:only|just|merely)\b)(?!\s+(?:more|less|fewer)\s+than\b)|"
+                    r"no(?!\s+(?:more|less|fewer|longer)\s+than\b)(?!\.\s*\d)|never|neither|nor|cannot|without|none|"
+                    r"nothing|nobody|nowhere|lacks?|lacked|lacking|absent|absence|unable|insignificant|"
+                    r"non-?significant|fail(?:s|ed)?\s+to)\b|n't|n\u2019t", re.I)
+# negation tied to a claim: as NEG_RE, but "without" is left out ("removing X" -> "without X" is a
+# paraphrase), and contrastive "rather than" / "instead of" count ("A, rather than B" == "A, not B")
+CLAIM_NEG_RE = re.compile(r"\b(?:not(?!\s+(?:only|just|merely)\b)(?!\s+(?:more|less|fewer)\s+than\b)|"
+                          r"no(?!\s+(?:more|less|fewer|longer)\s+than\b)(?!\.\s*\d)|never|neither|nor|cannot|none|"
+                          r"nothing|nobody|nowhere|lacks?|lacked|lacking|absent|absence|unable|insignificant|"
+                          r"non-?significant|fail(?:s|ed)?\s+to|rather\s+than|instead\s+of)\b|n't|n\u2019t", re.I)
+# hedges that change what a claim asserts; removing one strengthens the claim. "could" only counts in
+# its hedging sense ("could reflect"), not as ability ("we could train"); approximators directly before
+# a number are compared per number (see QUAL_RE) and are skipped here.
+MEANING_HEDGE_RE = re.compile(
+    r"\b(?:may(?!\s+\d)|might|could(?=\s+(?:be|have|reflect|explain|indicate|arise|account|result|stem|"
+    r"contribute|lead|affect|influence|drive|cause|also|partly|potentially)\b)|suggest(?:s|ed|ing)?|"
+    r"seem(?:s|ed|ingly)?|appear(?:s|ed)?\s+to|tend(?:s|ed)?\s+to|possibly|perhaps|potentially|probably|"
+    r"(?:un)?likely|presumably|arguably|plausibly|conceivably|roughly|approximately|nearly|almost|"
+    r"tentative(?:ly)?|speculat\w*|hypothesi[sz]\w*|preliminary)\b", re.I)
+APPROX_BEFORE_NUM_RE = re.compile(r"\s*[~\u2248]?\s*[-\u2212]?(?:\d|\.\d)")
+DIRECTION = {
+    "up": re.compile(r"\b(?:rose|rise[sn]?|rising|increas\w*|higher|grew|grow(?:s|n|ing)?|improv\w*|gained|greater|"
+                     r"larger|exceed\w*|boost\w*|outperform\w*)\b", re.I),
+    "down": re.compile(r"\b(?:fell|fall(?:s|en|ing)?|drop(?:s|ped|ping)?|decreas\w*|declin\w*|lower(?:ed|s)?|"
+                       r"reduc\w*|shrank|shrunk|shrink\w*|degrad\w*|worse\w*|smaller|underperform\w*)\b", re.I),
+}
+# clause boundaries inside a sentence: a negation or hedge is tied to the claim in its own clause
+CLAUSE_SPLIT_RE = re.compile(r"\s*;\s*|(?<!\d)\s*:\s*(?!\d)|\s*\u2014\s*|,?\s+(?=(?:but|while|whereas|although|though|unlike)\b)|,\s+(?=yet\b)", re.I)
 
 
 # --------------------------------------------------------------------------
@@ -505,8 +712,10 @@ def structure(text):
     sent_len = []
     for p in paras:
         for s in sentences_of(p):
+            # short sentences ("It failed.", "Why?") are the rhythm: they must count, or a source
+            # whose punch lives in them looks as flat as its flattened rewrite
             n = nwords(s)
-            if n >= 3:
+            if n >= 1:
                 sent_len.append(n)
     plen = [nwords(p) for p in paras]
 
@@ -546,25 +755,156 @@ class Doc:
 
 
 def finalize_proper_nouns(docs):
+    """A capitalised word is a proper noun mid-sentence. At the start of a sentence it is one only if it
+    is multi-capital or has a digit, appears capitalised mid-sentence somewhere, or is followed by
+    another capitalised name and is neither an ordinary word nor used in lower case in either text
+    ("Smith Labs", but not "As Table" or "In Figure")."""
     mid = set()
+    lower = set()
     for d in docs:
+        lower.update(w for w in re.findall(r"\b[a-z][a-z'\-]*\b", d.text))
         for c in d.caps:
             if not c["start"]:
                 mid.add(c["tok"])
     for d in docs:
         for c in d.caps:
             tok = c["tok"]
-            ok = (not c["start"]) or c["camel"] or tok in mid or c["nextcap"]
-            if tok == "A" and c["start"]:
-                ok = False
+            low = tok.lower()
+            ordinary = low in COMMON_WORDS or low in lower
+            ok = (not c["start"]) or c["camel"] or tok in mid or (c["nextcap"] and not ordinary)
             if ok:
                 d.facts.add("proper noun", tok, c["line"])
+
+
+def proper_noun_set(docs):
+    out = set()
+    for d in docs:
+        out.update(d.facts.kinds("proper noun"))
+    return out
+
+
+def claim_units(doc, pn):
+    """Cut the text into clauses. Each clause carries its anchors (facts weigh 3: numbers, years, proper
+    nouns; content-word stems weigh 1), its negations, meaning-bearing hedges and direction words."""
+    text = doc.text
+    prot = text
+    for a in ABBR:
+        prot = prot.replace(a, a.replace(".", "\x02"))
+    units = []
+
+    def para(off, end):
+        pos = off
+        bounds = [m.start() + off for m in SPLIT_RE.finditer(prot[off:end])] + [end]
+        for b in bounds:
+            sent = text[pos:b]
+            if sent.strip():
+                lead = len(sent) - len(sent.lstrip())
+                line = text.count("\n", 0, pos + lead) + 1
+                shown = re.sub(r"\s+", " ", sent).strip()
+                if len(shown) > 220:
+                    shown = shown[:217] + "..."
+                for cl in CLAUSE_SPLIT_RE.split(sent):
+                    if cl and cl.strip():
+                        units.append(clause_info(cl, pn, shown, line))
+            pos = b
+    pos = 0
+    for sep in re.finditer(r"\n\s*\n|" + BREAK, prot):
+        para(pos, sep.start())
+        pos = sep.end()
+    para(pos, len(prot))
+    return units
+
+
+def clause_info(cl, pn, sentence, line):
+    tmp = Facts()
+    extract_text_facts(cl, tmp, [])
+    anchors = {}
+    for kind in ("number", "year"):
+        for v in tmp.kinds(kind):
+            anchors[("n", v)] = 3
+    for m in CAP_RE.finditer(cl):
+        tok = m.group(0)[:-2] if m.group(0).endswith(("'s", "\u2019s")) else m.group(0)
+        if tok in pn:
+            anchors[("p", tok)] = 3
+    for w in re.findall(r"[A-Za-z]+", cl):
+        low = w.lower()
+        if len(low) < 4 or low in COMMON_WORDS or w in PLACEHOLDERS or w in pn or NEG_RE.fullmatch(low) \
+                or MEANING_HEDGE_RE.fullmatch(low):
+            continue
+        anchors.setdefault(("w", low[:5]), 1)
+    hedges = [m.group(0).lower() for m in MEANING_HEDGE_RE.finditer(cl)
+              if not (m.group(0).lower() in ("roughly", "approximately", "nearly", "almost")
+                      and APPROX_BEFORE_NUM_RE.match(cl, m.end()))]
+    return {"sentence": sentence, "line": line, "anchors": anchors,
+            "negation": [re.sub(r"\s+", " ", m.group(0).lower()) for m in CLAIM_NEG_RE.finditer(cl)], "hedge": hedges,
+            "dirs": {k for k, rx in DIRECTION.items() if rx.search(cl)}}
+
+
+def claim_matches(u, others):
+    """The clauses of the other text that carry this clause's claim: those whose shared anchor weight
+    is at least half of the best match. None when nothing matches well enough to judge."""
+    scored = [(sum(w for a, w in u["anchors"].items() if a in o["anchors"]), o) for o in others]
+    best = max((s for s, _ in scored), default=0)
+    if best < 2:
+        return None
+    return [o for s, o in scored if s and s >= 0.5 * best]
+
+
+def unmatched_marker(u, mine, theirs, kind):
+    """True if clause u (in `mine`) carries a `kind` marker that no counterpart in `theirs` carries.
+    A counterpart is a clause u matches well, or a marked clause that matches u well (so a hedge that
+    moved into a clause split off from u still counts). None of them matching at all: no verdict."""
+    ms = claim_matches(u, theirs)
+    if ms is None:
+        return False
+    if any(o[kind] for o in ms):
+        return False
+    for o in theirs:
+        if o[kind]:
+            back = claim_matches(o, mine)
+            if back and any(x is u for x in back):
+                return False
+    return True
+
+
+def compare_claims(src, new):
+    """Negations and hedges tied to claims, direction words next to the same numbers.
+    Returns (lost, gained, direction warnings, source units, rewrite units); lost and gained are
+    lists of (kind, unit)."""
+    pn = proper_noun_set([src, new])
+    su, nu = claim_units(src, pn), claim_units(new, pn)
+    lost, gained, dirw = [], [], []
+    for kind in ("negation", "hedge"):
+        for mine, theirs, out in ((su, nu, lost), (nu, su, gained)):
+            seen = set()
+            for u in mine:
+                if u[kind] and u["sentence"] not in seen and unmatched_marker(u, mine, theirs, kind):
+                    seen.add(u["sentence"])
+                    out.append((kind, u))
+    for u in su:
+        nums = {a for a in u["anchors"] if a[0] == "n"}
+        if not u["dirs"] or not nums:
+            continue
+        ms = [o for o in (claim_matches(u, nu) or []) if nums & set(o["anchors"])]
+        nd = set().union(*[o["dirs"] for o in ms]) if ms else set()
+        if nd and not (u["dirs"] & nd):
+            dirw.append("direction word flipped next to %s: source says %s (line %d: %s), rewrite says %s; check "
+                        "the claim did not reverse" % (", ".join(sorted(a[1] for a in nums)), "/".join(sorted(u["dirs"])),
+                                                       u["line"], u["sentence"], "/".join(sorted(nd))))
+    return lost, gained, dirw, su, nu
 
 
 KIND_ORDER = ["number", "year", "proper noun", "citation", "url", "quote", "ref", "label", "math", "macro"]
 
 
-def compare(src, new, strict):
+def first_sentence(units, value):
+    for u in units:
+        if ("n", value) in u["anchors"]:
+            return u["sentence"]
+    return ""
+
+
+def compare(src, new, strict, lenient_hedges=False, lenient_negations=False):
     dropped, added, warns = [], [], []
     for kind in KIND_ORDER:
         a, b = src.facts.kinds(kind), new.facts.kinds(kind)
@@ -577,6 +917,46 @@ def compare(src, new, strict):
                 if a[v] != b[v]:
                     msg = "%s %r appears %d time(s) in source, %d in rewrite" % (kind, v, a[v], b[v])
                     warns.append({"type": "count", "msg": msg, "strict_fail": True})
+    # claim markers: negations and meaning-bearing hedges tied to their clause's facts
+    lost, gained, dirw, su, nu = compare_claims(src, new)
+    lenient = {"negation": lenient_negations, "hedge": lenient_hedges}
+    for side, items, out in (("source", lost, dropped), ("rewrite", gained, added)):
+        for kind, u in items:
+            words = ", ".join(sorted(set(u[kind])))
+            if lenient[kind]:
+                warns.append({"type": kind, "msg": "%s %s: '%s' (%s line %d) has no counterpart in the matching "
+                              "%s sentence(s): %s" % (kind, "lost" if side == "source" else "added", words, side,
+                                                     u["line"], "rewrite" if side == "source" else "source",
+                                                     u["sentence"]), "strict_fail": True})
+            else:
+                out.append({"kind": kind, "value": words, "line": u["line"], "sentence": u["sentence"]})
+    # qualifiers fixed to a number: about/~ (a hedge) and bounds (more than, at least, <, ...)
+    nums_s = set(src.facts.kinds("number")) | set(src.facts.kinds("year"))
+    nums_n = set(new.facts.kinds("number")) | set(new.facts.kinds("year"))
+    qs, qn = src.facts.kinds("qualifier"), new.facts.kinds("qualifier")
+    for doc, a, b, other_nums, units, out, side in ((src, qs, qn, nums_n, su, dropped, "lost"),
+                                                    (new, qn, qs, nums_s, nu, added, "added")):
+        for v in sorted(set(a) - set(b)):
+            num = v.split(" ", 1)[1]
+            if num not in other_nums:
+                continue   # the number itself is DROPPED/ADDED already
+            kind = "hedge" if v.startswith("~") else "qualifier"
+            line = doc.facts.items[("qualifier", v)][1]
+            if kind == "hedge" and lenient_hedges:
+                warns.append({"type": "hedge", "msg": "approximator %s before %r (line %d): %s" %
+                              (side, num, line, first_sentence(units, num)), "strict_fail": True})
+            else:
+                out.append({"kind": kind, "value": v, "line": line, "sentence": first_sentence(units, num)})
+    # "from X to Y" reversed, direction words flipped next to the same numbers
+    so, no = src.facts.kinds("order"), new.facts.kinds("order")
+    for v in sorted(set(so) - set(no)):
+        x, y = v.split(" -> ")
+        rev = "%s -> %s" % (y, x)
+        if rev in no and rev not in so:
+            warns.append({"type": "order", "msg": "numbers swapped: source says 'from %s to %s' (line %d), rewrite says "
+                          "'from %s to %s'" % (x, y, src.facts.items[("order", v)][1], y, x), "strict_fail": True})
+    for msg in dirw:
+        warns.append({"type": "direction", "msg": msg, "strict_fail": True})
     for fam in HEDGE_FAMILIES:
         s, n = src.hedges[fam], new.hedges[fam]
         if s and n == 0:
@@ -614,13 +994,23 @@ def main(argv=None):
     ap = argparse.ArgumentParser(
         description="Check that a rewrite kept every fact of its source: numbers and units, years, proper "
                     "nouns, citation keys, URLs, quotes, LaTeX refs, math and macros. DROPPED or ADDED facts "
-                    "FAIL. Hedges, negations and rhythm produce warnings (failures with --strict).",
+                    "FAIL. A negation or meaning-bearing hedge lost from (or added to) a claim, matched by the "
+                    "facts and words around it, also FAILs, as does an approximator or bound fixed to a number "
+                    "('about 12%' -> '12%'). Overall hedge counts, negation counts, direction words, swapped "
+                    "'from X to Y' numbers and rhythm produce warnings (failures with --strict).",
         epilog="Exit codes: 0 PASS, 1 FAIL, 2 unreadable input.")
     ap.add_argument("source", help="the original text (.tex, .md, .txt)")
     ap.add_argument("rewrite", help="the rewritten text")
     ap.add_argument("--strict", action="store_true",
                     help="also fail on vanished hedge families, changed negation count, changed repeat counts "
-                         "of numbers/citations, and structural flattening")
+                         "of numbers/citations, flipped direction words, swapped 'from X to Y' numbers, "
+                         "lenient hedge/negation warnings, and structural flattening")
+    ap.add_argument("--lenient-hedges", action="store_true",
+                    help="report a hedge or approximator lost from or added to a claim as a warning instead of a "
+                         "failure (still a failure with --strict)")
+    ap.add_argument("--lenient-negations", action="store_true",
+                    help="report a negation lost from or added to a claim as a warning instead of a failure "
+                         "(still a failure with --strict)")
     ap.add_argument("--format", choices=["auto", "latex", "markdown", "text"], default="auto",
                     help="parse both files as this format (default: detect per file)")
     ap.add_argument("--json", action="store_true", help="emit JSON instead of the text report")
@@ -637,7 +1027,7 @@ def main(argv=None):
         print("ERROR: %s" % e, file=sys.stderr)
         return 2
     finalize_proper_nouns([src, new])
-    dropped, added, warns, sflag = compare(src, new, args.strict)
+    dropped, added, warns, sflag = compare(src, new, args.strict, args.lenient_hedges, args.lenient_negations)
     strict_fail = args.strict and (any(w["strict_fail"] for w in warns) or bool(sflag))
     failed = bool(dropped or added or strict_fail)
     n_warn = len(warns) + len(sflag)
@@ -645,7 +1035,8 @@ def main(argv=None):
 
     if args.json:
         print(json.dumps({
-            "result": result, "strict": args.strict, "source": args.source, "rewrite": args.rewrite,
+            "result": result, "strict": args.strict, "lenient_hedges": args.lenient_hedges,
+            "lenient_negations": args.lenient_negations, "source": args.source, "rewrite": args.rewrite,
             "formats": [src.fmt, new.fmt], "dropped": dropped, "added": added,
             "warnings": [w["msg"] for w in warns] + sflag,
             "structure": {"source": src.struct, "rewrite": new.struct},
@@ -659,8 +1050,12 @@ def main(argv=None):
     print("facts in source: " + ", ".join("%d %s" % (v, k) for k, v in counts.items() if v))
     for d in dropped:
         print("DROPPED %-11s %r  (source line %d)" % (d["kind"], d["value"], d["line"]))
+        if d.get("sentence"):
+            print("        in: %s" % d["sentence"])
     for a in added:
         print("ADDED   %-11s %r  (rewrite line %d)" % (a["kind"], a["value"], a["line"]))
+        if a.get("sentence"):
+            print("        in: %s" % a["sentence"])
     for w in warns:
         print("WARN %s%s" % (w["msg"], " [strict: fail]" if (args.strict and w["strict_fail"]) else ""))
     for f in sflag:

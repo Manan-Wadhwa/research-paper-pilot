@@ -6,8 +6,9 @@ guide to what a methods section must state. It is one domain pack; other fields 
 beside it (a clinical-trial pack, a causal-inference pack, a benchmark-evaluation pack). If your
 project is outside this domain, skip it.
 
-Used by: `evidence` (claim verdicts and pre-registration notes), `write` (methods and limitations),
-`review` (reviewer lens: methods and statistics), `revise` (answering "is this an artifact?").
+Used by: `evidence` (claim verdicts and pre-registration notes) and `review` (reviewer lens:
+methods and statistics); also `write` (methods and limitations) and `revise` (answering "is this an
+artifact?") when interpretability claims are drafted or defended.
 
 ## Contents
 
@@ -47,9 +48,12 @@ design and reporting side. If it is not installed, continue with this file.
 - Pick one primary metric before looking at results (a difference between the two competing output
   scores is usually better than a raw probability, because probabilities saturate and hide
   movement).
-- Express effects as a fraction of the gap between the two reference runs: effect = (patched minus
-  corrupted) / (clean minus corrupted), so 0 means no recovery and 1 means full recovery. Say what
-  the two reference runs are.
+- Express effects as a fraction of the gap between the two reference runs. For denoising
+  (patching clean activations into the corrupted run): effect = (patched minus corrupted) / (clean
+  minus corrupted), so 0 means no recovery and 1 means full recovery. For noising (patching
+  corrupted activations into the clean run) the reference flips: effect = (clean minus patched) /
+  (clean minus corrupted), so 0 means no damage and 1 means the behaviour is fully destroyed. Say
+  which direction was patched and what the two reference runs are.
 - State whether values outside 0 to 1 are clipped, and report how many were clipped. A normalised
   effect over 1 is a finding about the scale, not about a stronger mechanism.
 - Write the metric in one formula in Methods and use one name for it everywhere (W45).
@@ -88,8 +92,9 @@ comparison flatters the effect.
 Find the floor before normalising to it. Two floors matter in circuit work:
 
 - the **corrupted baseline**: the output with no intervention on corrupted input;
-- the **empty-circuit floor**: the output when the proposed circuit is kept and everything else is
-  replaced, but the circuit is empty.
+- the **empty-circuit floor**: the output when every component is replaced or ablated, so the kept
+  set is empty. A proposed circuit's faithfulness is measured between this floor and the full
+  model.
 
 Say which floor each reported fraction is scaled against. Scaling a random-set control against the
 wrong floor can make random sets look better (or worse) than they are, which silently changes the
@@ -206,6 +211,10 @@ Match the verb to the rung the experiment reached (invariant I4):
 | Sufficient (patching in recovers behaviour) | "is sufficient to recover", "carries" |
 | Necessary (ablating removes behaviour) | "is necessary for", "removing it abolishes" |
 | Mechanism (necessary, sufficient, specific, replicated) | "implements", "computes" |
+
+These rungs are not a second status ladder. The evidence rung caps which causal wording a claim may
+carry; its status (established, supported and so on, in `hypothesis.md`) still follows whether it
+cleared its bar.
 
 Avoid human mental-state words for model internals unless defined operationally (W22). Avoid
 "circuit" for a ranked list of components that was not tested for faithfulness.

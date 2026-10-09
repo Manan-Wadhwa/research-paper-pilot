@@ -13,8 +13,7 @@
       "source": "./",
       "description": "Takes a research project to a submitted paper in ten modes, with project memory kept in the project itself.",
       "version": "0.1.0",
-      "license": "MIT",
-      "skills": ["./skills/research-paper-pilot"]
+      "license": "MIT"
     }
   ]
 }

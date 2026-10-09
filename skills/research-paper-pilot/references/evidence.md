@@ -29,11 +29,15 @@ Run it for "what did we find", "what are our claims", "check my numbers", "is th
 |---|---|
 | id | `C1`, `C2`, ... never reused, even for retired claims |
 | claim | One sentence in plain words, stating direction and scope |
-| status | established, supported, equivocal, retired, exploratory (definitions in `references/hypothesis.md`) |
+| type | existence, systematic, hedged, narrow, guarantee (claim types in `references/hypothesis.md`) |
+| falsifier | The result that would make the team retract or narrow the claim |
+| verdict | Output of the evidence check below: Supported, Partially supported, Not supported, Equivocal |
+| status | established, supported, equivocal, retired, exploratory (definitions in `references/hypothesis.md`; set from the verdict by the mapping below) |
 | evidence | Result file path(s) the claim rests on |
 | number source | Macro name, or file plus field, for the headline number |
-| pre-registered | Where and when the criterion was locked, or "no" |
+| test fixed in advance | Lock strength (see What counts as a lock) with where and when, or "post hoc" |
 | caveat | The one limitation a hostile reader would raise first |
+| in paper | main, appendix or no |
 | paper location | Section or figure where the claim appears |
 
 Rules: a claim without an evidence file is not in the ledger, it is a rumor and goes in the open list. Edit a row by changing it and logging why in `paper/LAB_LOG.md`; never delete a row. Retired claims stay, because the list of what failed shapes the rigor section.
@@ -48,6 +52,19 @@ For each candidate claim, read the primary result file (not a summary of it) and
 - **Equivocal.** The point estimate passes while the interval straddles the bar, or one direction passes and the other fails, or the readout depends on a detector choice. Report as mixed.
 
 Procedure per claim: (1) restate the claim and the bar in one line, (2) open the file and copy the number with its interval and n, (3) compare with the bar, (4) check the denominator (a rate over discordant items is a rate over fewer items than the pool), (5) check which analysis variant the file names as primary, (6) write the verdict and the margin. Record disagreements between documents about the same number in the drift list.
+
+### From verdict to status
+
+The verdict is the output of this check; the status is the claim's place on the ladder in `references/hypothesis.md`. Write the verdict into the CLAIMS.md Verdict column, then set the status by this mapping:
+
+| Verdict | Status |
+|---|---|
+| Supported | supported, or established if it also meets the established criteria in `references/hypothesis.md` |
+| Partially supported | Narrow the claim to the part that passed, which becomes supported; record the rest as a separate row, equivocal or retired |
+| Not supported | retired |
+| Equivocal | equivocal |
+
+An exploratory claim keeps the status exploratory whatever its verdict, until a confirmatory test fixed in advance gives it a new verdict.
 
 ## Pre-registration and criterion notes
 
@@ -65,7 +82,7 @@ Write one before any run whose outcome will support a headline claim, any run th
 1. **Classification thresholds** for any gate that sorts items into groups. Lock the values already validated, not new ones fitted to the data the test will run on.
 2. **The pool and split.** Which items, which held-out set, how many. Name the file.
 3. **The primary metric**, defined exactly, including the denominator (for example "restricted to items where the two twins differ in clean behavior").
-4. **The bar**, as a number, and the statistic it applies to: a bare point estimate or an interval bound. Decide this in advance, give the reason (a one-shot comparison on few items favors the point estimate, a curve over many points can afford the stricter bound), and still report the interval.
+4. **The bar**, as a number, and the statistic it applies to: a bare point estimate or an interval bound. Decide this in advance, give the reason, and still report the interval. With few items, apply the bar to the interval bound, or raise the bar on the point estimate by a stated amount; never use the bare point estimate, which is most lenient exactly when n is small and its noise is largest.
 5. **Direction handling.** If the claim runs both ways (removal and injection, forward and reverse), the bar must hold in both, scored against each direction's own expected sign, never pooled.
 6. **Power or sample note**, run after the criteria are frozen, acting as a go/no-go gate and never as an input that can move the bar. If underpowered, the pre-written responses are: widen the pool before running, or report the result as exploratory. Loosening the bar to compensate is the one forbidden response.
 7. **What each outcome licenses.** One line per outcome (clears both, clears one, clears neither), including the headline framing it permits and the fallback it triggers.
@@ -99,7 +116,7 @@ Do not say "pre-registered" for the second row. Reviewers at rigor-minded venues
 - **Interval method.** Name it (percentile bootstrap, exact, Wilson) and the number of resamples. Resample the independent unit (pairs, items, prompts), not rows that share an item.
 - **n everywhere.** Give the n behind each rate, especially a filtered subset. A rate over a handful of items hides behind its percentage.
 - **Seeds.** State how many, and whether the claim holds across them. A single seed is a pilot.
-- **Nulls inherit the confound.** A null must differ from the real condition in exactly the property under test: random sets of the same size, random directions of the same norm, the same prompts. A null that differs in several ways proves little.
+- **Nulls inherit the confound.** See principle 3 under Ten experiment-design principles.
 - **Multiple comparisons.** Count every test run on the question, not only those reported. Apply a stated correction (FDR or Bonferroni) and give the family size.
 - **Effect sizes.** Report the size, not only the significance; large samples make trivial differences significant.
 - **Clipping and caps.** If a metric is clipped, normalized or capped (for example a recovery fraction bounded to a range), say so and show how many items hit the cap.
@@ -116,7 +133,7 @@ Typed numbers drift. The paper's numbers come from one place.
 1. A script reads result files and writes `paper/numbers.tex`: one `\newcommand` per number, with a name that says what it is, for example `\numFlipRate`. Each macro cites its file and field in a comment.
 2. Prose and captions use macros. Tables are generated or filled from the same file.
 3. Each result file has a provenance sidecar (script, git hash, date, config) so a number can be traced back.
-4. Run `python scripts/check_numbers.py paper/main.tex --numbers paper/numbers.tex --results-dir results`. It flags literals in prose that are not macros and numbers that appear in no result file. A WARN for a missing optional input is fine; continue.
+4. Run `python3 <skill>/scripts/check_numbers.py paper/main.tex --numbers paper/numbers.tex --results-dir results`. It flags literals in prose that are not macros and numbers that appear in no result file. A WARN for a missing optional input is fine; continue.
 5. Never edit a result file to make a number match (invariant I3). Fix the script or the claim.
 
 Rounding: round once, at the macro, to the precision the interval supports. Do not round a number and then compute with the rounded value.
@@ -141,7 +158,7 @@ Use these as a checklist when planning runs or judging existing ones.
 
 1. **One-variable counterfactuals.** Build pairs that differ in exactly one factor. A within-pair difference is then caused by that factor, which no between-group comparison can promise.
 2. **The system certifies its own labels.** When a label depends on what the model knows or does, derive it from the model's own sampled behavior, not from annotators' guesses about what it should find hard.
-3. **Nulls inherit the confound.** Every control matches the real condition on everything except the property under test.
+3. **Nulls inherit the confound.** Every control matches the real condition on everything except the property under test: random sets of the same size, random directions of the same norm, the same prompts. A null that differs in several ways proves little.
 4. **Held-out discipline.** Data used to select a component, threshold or pool never appears in the evaluation of that choice. Write down the split before the first look.
 5. **Screen cheap, verify expensive.** Use a fast approximation to propose candidates and a slow, direct intervention to confirm them. Report the screen only as a screen.
 6. **State predictions first.** Write what you expect, including predictions that might fail, before running. A prediction that partly failed and was published as such is worth more than ten that were fitted.
@@ -179,7 +196,7 @@ The paper's job is to let a skeptical reader reach the team's conclusion from th
 
 ## Outputs
 
-- Updated `paper/CLAIMS.md` with a verdict, evidence path, number source, pre-registered flag and caveat per row.
+- Updated `paper/CLAIMS.md` with a verdict (Verdict column), the status that follows from it by the mapping above, evidence path, number source, pre-registered flag and caveat per row.
 - Criterion notes under `paper/PREREG/<name>.md` for any run about to happen, with the commit hash placeholder.
 - `paper/numbers.tex` generator status, and the output of `check_numbers.py` summarized as counts, with the disagreement list for the user.
 - A LAB_LOG entry listing verdicts changed, notes written, and open items.

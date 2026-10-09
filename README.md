@@ -29,7 +29,7 @@ One skill, ten modes. Each mode has a reference file the agent reads first, and 
 | `revise` | Parses reviewer comments and builds the response letter and the change trail. |
 | `submit` | Runs the pre-submission checklist: anonymity, references, page limits, disclosures. |
 
-What makes it different from a general writing prompt is a short list of invariants that hold in every mode: every number traces to a result file, every citation is verified or marked `[VERIFY]`, claim strength follows evidence strength, pre-registered and post hoc results are labelled, and reviewer agents stay blind. The full list is in `skills/research-paper-pilot/SKILL.md`.
+What makes it different from a general writing prompt is a short list of invariants that hold in every mode: every number traces to a result file, every citation is verified or marked `[VERIFY]`, claim strength follows evidence strength, pre-registered and post hoc results are labelled, reviewer agents stay blind, and the paper reads without a glossary: plain words instead of project codes, with the audit trail kept in the repository rather than in the sentences. The full list is in `skills/research-paper-pilot/SKILL.md`.
 
 ## Install
 
@@ -59,7 +59,7 @@ Copy the folder `skills/research-paper-pilot` into your agent's skills directory
 | Claude Code | `~/.claude/skills/` | `.claude/skills/` |
 | Codex | `~/.codex/skills/` | `.agents/skills/` |
 
-Requirements: Python 3.9 or newer on your path as `python`, for the scripts. They use only the standard library. Network access is needed only for online citation verification.
+Requirements: Python 3.9 or newer, run as `python3` (on Windows, `python` or `py -3`), for the scripts. They use only the standard library. Network access is needed only for online citation verification.
 
 ## A 60-second tour
 
@@ -125,7 +125,7 @@ Alongside the context file, the skill maintains `paper/CLAIMS.md` (the claims le
 
 ## The output contract
 
-Every mode ends with the same four parts: files written, decisions taken, open items for you, and the next recommended mode. It does not summarise the files in prose, so the reply stays short and you read the files themselves.
+Every mode ends with two or three sentences saying where the project now stands and what changed, then the same four parts: files written, decisions taken, open items for you, and the next recommended mode. It does not summarise the files themselves, so the reply stays short and you read the files.
 
 ## FAQ
 
